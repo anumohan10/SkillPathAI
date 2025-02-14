@@ -33,11 +33,11 @@ if filename:
         print("Reading CSV file directly...")
         df = pd.read_csv(f"./{filename}")  
 
-    # ✅ Drop 'Unnamed: 0' column if it exists
+    # Drop 'Unnamed: 0' column if it exists
     if "Unnamed: 0" in df.columns:
         df.drop(columns=["Unnamed: 0"], inplace=True)
 
-    # ✅ Replace NaN values with None for Snowflake compatibility
+    #Replace NaN values with None for Snowflake compatibility
     df.replace({np.nan: None}, inplace=True)
 
     # Display first 5 rows
@@ -49,7 +49,7 @@ if filename:
 else:
     print("No files found in the dataset.")
 
-# ✅ Clean column names (remove spaces, special characters)
+#Clean column names (remove spaces, special characters)
 def clean_column_name(name):
     name = re.sub(r'\W+', '_', name)  # Replace special characters with _
     return name.lower()  # Convert to lowercase for consistency
@@ -67,7 +67,7 @@ conn = snowflake.connector.connect(
 )
 cur = conn.cursor()
 
-# ✅ Create structured table if not exists (with cleaned column names)
+#Create structured table if not exists (with cleaned column names)
 def generate_create_table_sql(table_name, df):
     type_mapping = {
         "int64": "NUMBER(38,0)",
@@ -90,7 +90,7 @@ create_table_sql = generate_create_table_sql(f"RAW_DATA.{table_name}", df)
 cur.execute(create_table_sql)
 print(f"Table {table_name} created successfully!")
 
-# ✅ Insert data in chunks (5000 rows per batch)
+#Insert data in chunks (5000 rows per batch)
 chunk_size = 5000  
 num_chunks = math.ceil(len(df) / chunk_size)
 
