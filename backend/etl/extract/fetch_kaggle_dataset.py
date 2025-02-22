@@ -45,9 +45,9 @@ def fetch_kaggle_dataset(dataset_id, output_path):
     combined_df.to_csv(os.path.join("./tmp", output_path), index=False, encoding="utf-8")
 
 
-    # for file in csv_files:
-    #     file_path = os.path.join("./tmp", file)
-    #     os.rename(file_path, os.path.join("./tmp", output_path))
+    for file in csv_files:
+        file_path = os.path.join("./tmp_unprocessed", file)
+        os.remove(file_path)
     
     print(f"Dataset concatenated and saved to {output_path}")
     return os.path.join("./tmp", output_path)
