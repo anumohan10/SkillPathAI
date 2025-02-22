@@ -9,8 +9,8 @@ cursor = conn.cursor(DictCursor)
 
 # Dictionary mapping stages to table names
 stages_to_tables = {
-    "COURSERA_STAGE": "COURSERA_COURSES",
-    "EDX_STAGE": "EDX_COURSES",
+    "COURSERA_STAGE": "COURSERA_COURSES_1",
+    "EDX_STAGE": "EDX_COURSES_1",
     "UDACITY_STAGE": "UDACITY_COURSES",
     "UDEMY_STAGE": "UDEMY_COURSES",
     "PLURALSIGHT_STAGE": "PLURALSIGHT_COURSES"

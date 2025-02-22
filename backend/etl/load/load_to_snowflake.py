@@ -12,8 +12,9 @@ def upload_to_snowflake(file_path, file_name, stage_name):
     stage_command = f"PUT file://{file_path} @{stage_name} AUTO_COMPRESS=TRUE OVERWRITE=TRUE;"
     cur.execute(stage_command)
     
+    
     # Cleanup: Remove the local file after upload
-    os.remove(file_path)
+    os.rename(file_path, os.getcwd()+f"/processed/{file_name}")
 
     print(f"File {file_name} successfully uploaded to {stage_name} and deleted locally.")
     cur.close()
