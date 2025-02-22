@@ -15,7 +15,7 @@ if filename:
     print(f"Downloading file: {filename}")
 
     # Download the dataset file
-    kaggle.api.dataset_download_files(dataset, path="./", unzip=True)  # ✅ Downloads and unzips
+    kaggle.api.dataset_download_files(dataset, path="./", unzip=True)  # Downloads and unzips
 
     # Check if the file is a ZIP or CSV
     if filename.endswith(".zip"):
