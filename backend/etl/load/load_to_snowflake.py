@@ -14,7 +14,7 @@ def upload_to_snowflake(file_path, file_name, stage_name):
     
     
     # Cleanup: Remove the local file after upload
-    os.rename(file_path, os.getcwd()+f"/processed/{file_name}")
+    # os.rename(file_path, os.getcwd()+f"processed/{file_name}")
 
     print(f"File {file_name} successfully uploaded to {stage_name} and deleted locally.")
     cur.close()

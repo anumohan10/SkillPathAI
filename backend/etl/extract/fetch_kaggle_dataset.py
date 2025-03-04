@@ -42,6 +42,8 @@ def fetch_kaggle_dataset(dataset_id, output_path):
 
     # Save concatenated DataFrame to a single compressed gzip file
 # Save the DataFrame directly as a CSV file (without compression)
+    if not os.path.exists("./tmp"):
+        os.makedirs("./tmp")
     combined_df.to_csv(os.path.join("./tmp", output_path), index=False, encoding="utf-8")
 
 
