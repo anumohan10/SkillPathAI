@@ -5,9 +5,9 @@ from scrapers.factory import ScraperFactory
 
 def main():
     # Example: Change platform to "udacity", "coursera", or "edx" as needed.
-    platform = "edx"
-    output_json_file = "course_metadata.json"
-    cache_file = "processed_links_cache.json"
+    platform = "udacity"
+    output_json_file = platform+"_course_metadata.json"
+    cache_file = platform+"_processed_links_cache.json"
     
     driver = create_headless_driver()
     scraper = ScraperFactory.get_scraper(platform, driver)
