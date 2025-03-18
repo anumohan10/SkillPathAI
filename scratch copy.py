@@ -544,27 +544,70 @@ def create_headless_driver():
 
 
 def get_course_links(driver, catalog_url):
+    # """
+    # Retrieve and return a list of unique course link URLs from the catalog page.
+    # """
+    # try:
+    #     logging.info("Loading catalog URL: %s", catalog_url)
+    #     driver.get(catalog_url)
+    #     time.sleep(2)  # Allow page to load
+    #     soup = BeautifulSoup(driver.page_source, "html.parser")
+    # except Exception as e:
+    #     logging.error("Error loading catalog page (%s): %s", catalog_url, e)
+    #     return []
+
+    # links = set()
+    # for a_tag in soup.find_all("a", href=True):
+    #     href = a_tag["href"]
+    #     if "course/" in href:
+    #         if not href.startswith("http"):
+    #             href = "https://www.udacity.com" + href
+    #         links.add(href)
+    # logging.info("Found %d course links on page.", len(links))
+    # return list(links)
     """
-    Retrieve and return a list of unique course link URLs from the catalog page.
+    Fetch subcategory links and then course links from a Udemy catalog page.
     """
     try:
         logging.info("Loading catalog URL: %s", catalog_url)
         driver.get(catalog_url)
-        time.sleep(2)  # Allow page to load
+        time.sleep(2)
         soup = BeautifulSoup(driver.page_source, "html.parser")
     except Exception as e:
         logging.error("Error loading catalog page (%s): %s", catalog_url, e)
         return []
 
-    links = set()
-    for a_tag in soup.find_all("a", href=True):
-        href = a_tag["href"]
-        if "course/" in href:
-            if not href.startswith("http"):
-                href = "https://www.udacity.com" + href
-            links.add(href)
-    logging.info("Found %d course links on page.", len(links))
-    return list(links)
+    # Step 1: Get subcategory links
+    category_links = set()
+    subcategory_nav = soup.find('nav', {'aria-label': 'Explore'})
+    if subcategory_nav:
+        for a_tag in subcategory_nav.find_all("a", href=True):
+            href = a_tag["href"]
+            if "/courses/development/" in href:
+                if not href.startswith("http"):
+                    href = "https://www.udemy.com" + href
+                subcategory_links.add(href)
+
+    logging.info("Found %d subcategory links on page.", len(subcategory_links))
+
+    # Step 2: Fetch course links from each subcategory (optional)
+    course_links = set()
+    for subcat_url in subcategory_links:
+        try:
+            html_source = parse_course_page(subcat_url)
+            if html_source:
+                subcat_soup = BeautifulSoup(html_source, "html.parser")
+                for a_tag in subcat_soup.find_all("a", href=True):
+                    href = a_tag["href"]
+                    if "/course/" in href and "draft" not in href:
+                        if not href.startswith("http"):
+                            href = "https://www.udemy.com" + href
+                        course_links.add(href)
+        except Exception as e:
+            logging.error("Error processing subcategory (%s): %s", subcat_url, e)
+
+    logging.info("Found %d course links across subcategories.", len(course_links))
+    return list(course_links)
 
 
 def parse_course_page(driver, course_url):
@@ -684,16 +727,16 @@ def update_processed_links(cache_file, processed_links):
 
 
 def main():
-    base_catalog_url = "https://www.udacity.com/catalog"
-    output_json_file = "course_metadata.json"
-    cache_file = "processed_links_cache.json"
+    base_catalog_url = "https://www.udemy.com/courses/development/"
+    output_json_file = "udemy_course_metadata.json"
+    cache_file = "udemy_processed_links_cache.json"
     
     driver = create_headless_driver()
     all_metadata = []
     processed_links_cache = load_processed_links(cache_file)
 
     # Loop through all 26 pages of the catalog
-    for page in range(13, 27):
+    for page in range(1, 5):
         if page == 1:
             catalog_url = base_catalog_url
         else:

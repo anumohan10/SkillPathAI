@@ -2,6 +2,7 @@
 from .udacity import UdacityScraper
 from .coursera import CourseraScraper  # existing implementation
 from .edx import EdxScraper
+from .udemy import UdemyScraper
 
 class ScraperFactory:
     @staticmethod
@@ -16,5 +17,7 @@ class ScraperFactory:
             return CourseraScraper(driver, "https://www.coursera.org/courses")
         elif platform == "edx":
             return EdxScraper(driver, "https://www.edx.org/search")
+        elif platform == "udemy":
+            return UdemyScraper(driver, "https://www.udemy.com/courses")
         else:
             raise ValueError(f"Unsupported platform: {platform}")
