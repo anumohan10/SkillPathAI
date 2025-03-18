@@ -38,7 +38,7 @@ class CourseScraper(ABC):
         """
         pass
 
-    def process_catalog_page(self, page_number):
+    def process_catalog_page(self, page_number, processed_links_cache):
         """
         Process a catalog page and return a list of course metadata dictionaries.
         """
@@ -46,10 +46,13 @@ class CourseScraper(ABC):
         logging.info("Processing catalog page %d: %s", page_number, catalog_url)
 
         course_links = self.get_course_links(catalog_url)
-        logging.info("Found %d course links on catalog page %d.", len(course_links), page_number)
+        logging.info("Found course links on catalog page %d.", page_number)
 
         page_metadata = []
         for link in course_links:
+            if link in processed_links_cache:
+                logging.info("Skipping already processed link: %s", link)
+                continue
             logging.info("Processing course link: %s", link)
             html_source = self.parse_course_page(link)
             if not html_source:
@@ -60,4 +63,6 @@ class CourseScraper(ABC):
                 page_metadata.append(course_metadata)
             else:
                 logging.warning("No metadata extracted for link: %s", link)
+            logging.info("Cached course link: %s", link)
+            processed_links_cache.add(link)
         return page_metadata

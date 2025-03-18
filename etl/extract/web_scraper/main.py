@@ -5,7 +5,7 @@ from scrapers.factory import ScraperFactory
 
 def main():
     # Example: Change platform to "udacity", "coursera", or "edx" as needed.
-    platform = "udacity"
+    platform = "edx"
     output_json_file = platform+"_course_metadata.json"
     cache_file = platform+"_processed_links_cache.json"
     
@@ -15,15 +15,10 @@ def main():
     processed_links_cache = load_processed_links(cache_file)
 
     # Loop through pages (adjust range as needed)
-    for page in range(1, 5):
-        page_metadata = scraper.process_catalog_page(page)
+    for page in range(1):
+        page_metadata = scraper.process_catalog_page(page, processed_links_cache)
         for meta in page_metadata:
-            url = meta.get('URL', '')
-            if url in processed_links_cache:
-                logging.info("Skipping already processed link: %s", url)
-                continue
             all_metadata.append(meta)
-            processed_links_cache.add(url)
 
     update_processed_links(cache_file, processed_links_cache)
     save_json(all_metadata, output_json_file)
