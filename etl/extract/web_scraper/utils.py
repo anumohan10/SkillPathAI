@@ -41,7 +41,7 @@ def save_json(data, output_file):
     Write the data to a JSON file.
     """
     try:
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, 'a', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
         logging.info("Data successfully written to %s", output_file)
     except Exception as e:
