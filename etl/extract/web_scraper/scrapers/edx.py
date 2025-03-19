@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from .base import CourseScraper
+import re
 
 class EdxScraper(CourseScraper):
     def get_catalog_url(self, page_number):
@@ -44,7 +45,8 @@ class EdxScraper(CourseScraper):
                     link = div.find_element(By.TAG_NAME, "a")
                     url = link.get_attribute("href")
                     if url:  # Ensure the URL exists
-                        course_urls.add(url)
+                        trimmed_url = re.sub(r'\?.*', '', url)
+                        course_urls.add(trimmed_url)
                 except Exception as e:
                     logging.error(f"Error extracting URL from a div on current page: {e}")
                     continue
