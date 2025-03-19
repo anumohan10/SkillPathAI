@@ -15,7 +15,7 @@ def main():
     processed_links_cache = load_processed_links(cache_file)
 
     # Loop through pages (adjust range as needed)
-    for page in range(1,42):
+    for page in range(1, 45):
         page_metadata = scraper.process_catalog_page(page, processed_links_cache)
         for meta in page_metadata:
             all_metadata.append(meta)
