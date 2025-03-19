@@ -15,7 +15,7 @@ class EdxScraper(CourseScraper):
         Build the edX catalog URL.
         Example: "https://www.edx.org/search?tab=course&page=2"
         """
-        return f"https://www.edx.org/search?tab=course&page={page_number}"
+        return f"https://www.edx.org/search?tab=course&language=English&page={page_number}"
 
     def get_course_links(self, catalog_url):
         """
@@ -102,6 +102,10 @@ class EdxScraper(CourseScraper):
         course_data = {}
 
         print(f"Scraping - Page title: {soup.title.string if soup.title else 'No title found'}")
+        
+        #  URL from the meta tag**
+        meta_url = soup.find('meta', {'property': 'og:url'})
+        course_data["URL"] = meta_url.get('content') if meta_url else "Not found"
 
         # 1. Course Name (look for the main course title, typically in an h1)
         try:
@@ -293,16 +297,6 @@ class EdxScraper(CourseScraper):
         except:
             print(f"Language not found for page")
             course_data["language"] = "Not found"
-
-        # 13. About this course
-        try:
-            about_course = soup.find('h2', string='About this course').find_next('div').find('p')
-            if not about_course:
-                about_course = soup.find('div', string=lambda text: text and 'About this course' in text).find_next('p') if soup.find('div', string=lambda text: text and 'About this course' in text) else None
-            course_data["about_this_course"] = about_course.text.strip() if about_course else "Not found"
-        except:
-            print(f"About this course not found for page")
-            course_data["about_this_course"] = "Not found"
             
         # 13. Price
         course_data["price"] = "$199.2"
