@@ -15,7 +15,7 @@ def upload_to_snowflake(file_path, file_name, stage_name):
     create_json_format = "CREATE OR REPLACE FILE FORMAT SKILLPATH_DB.RAW_DATA.JSON_FORMAT \
     TYPE = 'JSON'\
     STRIP_OUTER_ARRAY = TRUE;"
-    create_stage = "CREATE OR REPLACE STAGE SKILLPATH_DB.RAW_DATA.UDACITY_SCRAPED_STAGE;"
+    create_stage = "CREATE OR REPLACE STAGE SKILLPATH_DB.RAW_DATA.EDX_SCRAPED_STAGE;"
     stage_command = f"PUT file://{file_path} @{stage_name} AUTO_COMPRESS=TRUE OVERWRITE=TRUE;"
     
     cur.execute(create_json_format)
@@ -30,8 +30,8 @@ def upload_to_snowflake(file_path, file_name, stage_name):
     conn.close()
 
 def main():
-    path = './udacity_course_metadata.json'
-    upload_to_snowflake(os.path.abspath(path), 'udacity_course_metadata.json', 'UDACITY_SCRAPED_STAGE')
+    path = './edx_course_metadata.json'
+    upload_to_snowflake(os.path.abspath(path), 'edx_course_metadata.json', 'EDX_SCRAPED_STAGE')
 if __name__ == "__main__":
     main()
 

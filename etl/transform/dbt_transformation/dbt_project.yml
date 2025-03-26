@@ -30,7 +30,9 @@ clean-targets:         # directories to be removed by `dbt clean`
 # directory as views. These settings can be overridden in the individual model
 # files using the `{{ config(...) }}` macro.
 on-run-start:
-  - "{{ create_stg_udacity_raw() }}"
+  - "{{ create_stg_edx_raw() }}"
+  - "{{ copy_to_stg_edx_raw() }}"
+  - "{{ create_stg_udacity_raw()}}"
   - "{{ copy_to_stg_udacity_raw() }}"
 
 models:
