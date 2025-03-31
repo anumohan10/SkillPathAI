@@ -2,5 +2,9 @@
     "anumohan": {
         "email": "anusreemohanan22@gmail.com",
         "password": "$2b$12$Uckhz53IPU7YityHJsZokuM4t0MNYX4XFt2OYSwiXCPEkKicgZST6"
+    },
+    "demo": {
+        "email": "demo@gmail.com",
+        "password": "$2b$12$CU4V7SBf3gNwXCXIX27LruFcOZgiqkrZSa/HYlpX.VlGt3paNbRFW"
     }
 }
