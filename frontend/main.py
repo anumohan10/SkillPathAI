@@ -4,7 +4,7 @@ from auth import login_page, signup_page
 from dashboard import main_app
 
 # Load custom CSS from styles.css
-with open("frontend/styles.css", "r") as f:
+with open("styles.css", "r") as f:
     css = f.read()
 st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 

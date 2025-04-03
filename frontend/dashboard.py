@@ -12,7 +12,7 @@ from backend.services.skill_matcher import match_skills, extract_skills_from_tex
 from frontend.components.career_chat import CareerChat
 
 # Load custom CSS from styles.css
-with open("frontend/styles.css", "r") as f:
+with open("styles.css", "r") as f:
     css = f.read()
 st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
