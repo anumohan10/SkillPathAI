@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: RAW_DATA
+    database: SKILLPATH_DB  
+    schema: RAW_DATA  
+    tables:
+      - name: STG_UDACITY_RAW
+      - name: STG_EDX_RAW
+      - name: STG_UDEMY_COURSE_PREREQUISITES
+  - name: PROCESSED_DATA
+    database: SKILLPATH_DB  
+    schema: PROCESSED_DATA  
+    tables:
+      - name: UDEMY_COURSES

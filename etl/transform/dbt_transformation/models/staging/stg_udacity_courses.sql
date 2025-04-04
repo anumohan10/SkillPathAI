@@ -1,5 +1,5 @@
 WITH source AS (
-    SELECT * FROM {{ source('RAW_DATA','STG_UDACITY_RAW') }}
+    SELECT * FROM {{ source('RAW_DATA','STG_UDACITY_RAW') }} WHERE raw_content:"Course Name" IS NOT NULL
 ),
 
 transformed AS (

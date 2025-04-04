@@ -42,4 +42,3 @@ models:
     example:
       +materialized: view
       +enabled: true
-    

@@ -1,9 +1,0 @@
-version: 2
-
-sources:
-  - name: RAW_DATA
-    database: SKILLPATH_DB  
-    schema: RAW_DATA  
-    tables:
-      - name: STG_UDACITY_RAW
-      - name: STG_EDX_RAW
