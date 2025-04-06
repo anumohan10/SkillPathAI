@@ -137,35 +137,37 @@ class ResumeSearchService:
             try:
                 resume_id = str(uuid.uuid4())
                 missing_skills = self._calculate_missing_skills(extracted_skills, target_role)
-            
-            # Format arrays properly for Snowflake
-                extracted_skills_str = "ARRAY_CONSTRUCT(" + ", ".join([f"'{skill}'" for skill in extracted_skills]) + ")"
-                missing_skills_str = "ARRAY_CONSTRUCT(" + ", ".join([f"'{skill}'" for skill in missing_skills]) + ")"
-            
-            # Clean resume text for SQL insertion (single quotes need to be escaped)
+
+                # Clean resume text for SQL insertion (escape single quotes)
                 cleaned_resume_text = resume_text.replace("'", "''")
-            
-                insert_query = f"""
-            INSERT INTO SKILLPATH_DB.PUBLIC.RESUMES 
-            (id, user_name, resume_text, extracted_skills, target_role, missing_skills)
-            VALUES (
-                '{resume_id}', 
-                '{user_name}', 
-                '{cleaned_resume_text}', 
-                {extracted_skills_str}, 
-                '{target_role}', 
-                {missing_skills_str}
-            )
-            """
-            
-                cursor.execute(insert_query)
+
+                # Prepare SQL with PARSE_JSON for array columns
+                insert_query = """
+                INSERT INTO SKILLPATH_DB.PUBLIC.RESUMES 
+                (id, user_name, resume_text, extracted_skills, target_role, missing_skills)
+                SELECT %s, %s, %s, PARSE_JSON(%s), %s, PARSE_JSON(%s)
+                """
+
+                # Execute with JSON strings for array fields
+                cursor.execute(
+                    insert_query,
+                    (
+                    resume_id,
+                    user_name,
+                    cleaned_resume_text,
+                    json.dumps(extracted_skills),
+                    target_role,
+                    json.dumps(missing_skills),
+                 ),
+                )
+
                 self.conn.commit()
-            
                 logger.info(f"✅ Successfully stored resume for {user_name} in Snowflake.")
-        
+
             except Exception as e:
                 logger.error(f"❌ Error storing resume: {e}")
                 raise
+
 
     def search_resumes(self, resume_text: str, target_role: str = None, limit: int = 5):
         """Search resumes using Cortex Search with cleaned text."""

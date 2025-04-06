@@ -109,16 +109,11 @@ def courses():
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Learning Path ---
+# --- Learning Path ---
 def learning_path():
-    st.header("Learning Path")
-    with st.container():
-        st.markdown('<div class="container-card">', unsafe_allow_html=True)
-        st.write("Generate your personalized learning path based on your skills and goals.")
-        study_hours = st.slider("Preferred study hours per week:", 1, 40, 10)
-        if st.button("Generate Learning Path"):
-            st.write("Generating learning path...")
-            st.success("Your personalized learning path is ready!")
-        st.markdown('</div>', unsafe_allow_html=True)
+    from frontend.pages.learning_path import learning_path_chat
+    learning_path_chat()
+
 
 # --- Career Transition Chat System ---
 def career_transition():

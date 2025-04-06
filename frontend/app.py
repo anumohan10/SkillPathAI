@@ -11,6 +11,7 @@ from backend.services.cortex_service import ResumeSearchService
 
 from backend.services.chat_service import ChatService
 from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
+from frontend.pages.learning_path import learning_path_chat
 
 
 from frontend.components.career_chat import CareerChat
@@ -127,12 +128,8 @@ def courses():
 
 # --- Learning Path ---
 def learning_path():
-    st.header("Learning Path")
-    st.write("Generate your personalized learning path based on your skills and goals.")
-    study_hours = st.slider("Preferred study hours per week:", 1, 40, 10)
-    if st.button("Generate Learning Path"):
-        st.write("Generating learning path...")
-        st.success("Your personalized learning path is ready!")
+    learning_path_chat()
+
 
 # --- Career Transition Chat System ---
 # --- Career Transition Chat System ---
@@ -324,6 +321,8 @@ def career_transition():
                 st.session_state["chat_messages"].append(error_msg)
                 st.session_state["career_chat_state"] = "ask_target_career"
                 st.rerun()
+  
+
     
     elif st.session_state["career_chat_state"] == "show_results":
         # Display results
