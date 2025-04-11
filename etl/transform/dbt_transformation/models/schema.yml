@@ -8,8 +8,18 @@ sources:
       - name: STG_UDACITY_RAW
       - name: STG_EDX_RAW
       - name: STG_UDEMY_COURSE_PREREQUISITES
+      - name: STG_EDX_COURSES
+      - name: STG_UDACITY_COURSES
   - name: PROCESSED_DATA
     database: SKILLPATH_DB  
     schema: PROCESSED_DATA  
     tables:
       - name: UDEMY_COURSES
+  - name: RAW_DATA_PROCESSED_DATA
+    database: SKILLPATH_DB  
+    schema: RAW_DATA_PROCESSED_DATA  
+    tables:
+      - name: UDACITY_COURSES_ENRICHED
+      - name: STG_UDEMY_COURSES
+      - name: EDX_COURSES_ENRICHED
+    
