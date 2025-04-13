@@ -10,6 +10,7 @@ sources:
       - name: STG_UDEMY_COURSE_PREREQUISITES
       - name: STG_EDX_COURSES
       - name: STG_UDACITY_COURSES
+      - name: STG_JOB_POSTINGS
   - name: PROCESSED_DATA
     database: SKILLPATH_DB  
     schema: PROCESSED_DATA  
