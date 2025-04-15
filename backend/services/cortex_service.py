@@ -1,3 +1,4 @@
+#backend/services/cortex_service.py
 import json
 import uuid
 import logging
@@ -108,6 +109,7 @@ class ResumeSearchService:
         # Normalize spaces
         resume_text = re.sub(r'\s+', ' ', resume_text).strip()
         return resume_text
+    
     def _calculate_missing_skills(self, extracted_skills, target_role):
         """Calculate missing skills for a target role."""
         # Define required skills for common roles

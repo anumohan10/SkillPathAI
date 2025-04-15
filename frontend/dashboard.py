@@ -10,6 +10,11 @@ from backend.services.cortex_service import ResumeSearchService
 from backend.services.chat_service import ChatService
 from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
 from frontend.components.career_chat import CareerChat
+from backend.services.learning_path_service import get_learning_path
+#from frontend.pages.learning_path import display_learning_path
+
+
+
 
 # Load custom CSS from styles.css
 with open("styles.css", "r") as f:
@@ -425,7 +430,7 @@ def main_app():
     elif selection == "Courses":
         courses()
     elif selection == "Learning Path":
-        learning_path()
+         learning_path()
     elif selection == "Career Transition":
         career_transition()
 
