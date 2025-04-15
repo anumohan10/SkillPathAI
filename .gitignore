@@ -1,3 +1,4 @@
 .env
 venv/
 frontend/learning_path_debug.log
+CLAUDE.md
