@@ -51,54 +51,130 @@ def extract_skills_from_text(text: str) -> List[str]:
 
 def get_job_requirements(role: str) -> Dict[str, List[str]]:
     """
-    Get required skills for a given role.
-    In production, this would connect to a database or API.
-    """
-    # Define job requirements for common roles
-    job_requirements = {
-        "Data Scientist": {
-            "essential": ["Python", "SQL", "Machine Learning", "Statistics", "Data Analysis"],
-            "preferred": ["TensorFlow", "PyTorch", "Pandas", "NumPy", "Data Visualization"]
-        },
-        "Software Engineer": {
-            "essential": ["Python", "Java", "JavaScript", "Git", "Algorithms"],
-            "preferred": ["Docker", "Kubernetes", "AWS", "CI/CD", "React", "Angular"]
-        },
-        "Full Stack Developer": {
-            "essential": ["HTML", "CSS", "JavaScript", "Node.js", "SQL"],
-            "preferred": ["React", "Angular", "Vue", "MongoDB", "Express", "Django"]
-        },
-        "Data Analyst": {
-            "essential": ["SQL", "Excel", "Data Analysis", "Data Visualization"],
-            "preferred": ["Python", "R", "Tableau", "Power BI", "Statistics"]
-        },
-        "DevOps Engineer": {
-            "essential": ["Linux", "Docker", "Kubernetes", "CI/CD", "Cloud"],
-            "preferred": ["AWS", "Azure", "Terraform", "Ansible", "Monitoring"]
-        },
-        "Product Manager": {
-            "essential": ["Product Management", "Agile", "Communication", "Strategic Planning"],
-            "preferred": ["Technical Background", "UX", "Data Analysis", "Market Research"]
-        },
-        "UX Designer": {
-            "essential": ["User Research", "UI Design", "Wireframing", "Prototyping"],
-            "preferred": ["Figma", "Sketch", "Adobe XD", "User Testing", "HTML/CSS"]
-        },
-        "AI Engineer": {
-            "essential": ["Python", "Machine Learning", "Deep Learning", "Math"],
-            "preferred": ["TensorFlow", "PyTorch", "NLP", "Computer Vision", "MLOps"]
-        }
-    }
+    Dynamically get required skills for a given role using Snowflake Cortex.
+    No hardcoded roles or skills.
     
-    # Handle case when role is not in our predefined list
-    if role not in job_requirements:
-        # Return a generic template with empty lists
+    Args:
+        role (str): The target role to get skill requirements for
+        
+    Returns:
+        dict: Dictionary with "essential" and "preferred" skill lists
+    """
+    # Import here to avoid circular import
+    from backend.database import get_snowflake_connection
+    from backend.services.chat_service import ChatService
+    
+    try:
+        # Try to use ChatService for getting skill requirements
+        chat_service = ChatService()
+        
+        prompt = (
+            f"You are a career expert in 2025. For a {role} position, identify two categories of required skills:\n"
+            f"1. Essential skills (must-have skills) - list 5 specific skills\n"
+            f"2. Preferred skills (nice-to-have skills) - list 5 specific skills\n\n"
+            f"Return your answer as a JSON object with 'essential' and 'preferred' arrays. "
+            f"Don't include any explanation, just return the JSON."
+        )
+        
+        response = chat_service.get_llm_response(prompt)
+        
+        # Try to parse JSON response
+        try:
+            import json
+            import re
+            
+            # Try to find JSON-like structure with regex
+            json_pattern = r'\{.*?"essential".*?"preferred".*?\}'
+            json_match = re.search(json_pattern, response, re.DOTALL)
+            
+            if json_match:
+                skills_json = json_match.group(0)
+                skills_data = json.loads(skills_json)
+                
+                # Validate expected format
+                if 'essential' in skills_data and 'preferred' in skills_data:
+                    if isinstance(skills_data['essential'], list) and isinstance(skills_data['preferred'], list):
+                        return skills_data
+            
+            # If we can't find structured JSON, try fallback query
+            return query_for_skills(role)
+            
+        except Exception as e:
+            # If JSON parsing fails, try our query-based approach
+            return query_for_skills(role)
+            
+    except Exception as e:
+        # Fallback to database query if chat service fails
+        return query_for_skills(role)
+
+def query_for_skills(role: str) -> Dict[str, List[str]]:
+    """
+    Use Snowflake query to get role requirements without hardcoding.
+    
+    Args:
+        role (str): The target role
+        
+    Returns:
+        dict: Skills categorized as essential and preferred
+    """
+    try:
+        from backend.database import get_snowflake_connection
+        conn = get_snowflake_connection()
+        cursor = conn.cursor()
+        
+        # Use Snowflake Cortex to search for role requirements
+        query = f"""
+        SELECT PARSE_JSON(
+            SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+                'SKILLPATH_SEARCH_POC',
+                '{{
+                    "query": "What are the essential and preferred skills for a {role} role in 2025?",
+                    "columns": ["skill_category", "skill_name"],
+                    "limit": 20
+                }}'
+            )
+        )['results'] as results;
+        """
+        
+        cursor.execute(query)
+        result = cursor.fetchone()[0]
+        
+        # Process results
+        essential_skills = []
+        preferred_skills = []
+        
+        if result and isinstance(result, list):
+            for item in result:
+                if 'skill_category' in item and 'skill_name' in item:
+                    category = item['skill_category'].lower() if item['skill_category'] else ''
+                    skill = item['skill_name']
+                    
+                    if skill and isinstance(skill, str):
+                        if 'essential' in category or 'required' in category or 'must' in category:
+                            essential_skills.append(skill)
+                        elif 'preferred' in category or 'nice' in category or 'optional' in category:
+                            preferred_skills.append(skill)
+                        else:
+                            # If category is unclear, consider it essential
+                            essential_skills.append(skill)
+        
+        # If no skills found, use an empty list but don't hardcode
+        return {
+            "essential": essential_skills[:5],  # Limit to 5 skills
+            "preferred": preferred_skills[:5]   # Limit to 5 skills
+        }
+        
+    except Exception as e:
+        # If all else fails, return empty lists without hardcoding
         return {
             "essential": [],
             "preferred": []
         }
-    
-    return job_requirements[role]
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def match_skills(extracted_skills: List[str], target_role: str) -> Dict[str, Any]:
     """

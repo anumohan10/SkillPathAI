@@ -7,14 +7,15 @@ from backend.database import get_snowflake_connection
 # Set up logger
 logger = logging.getLogger(__name__)
 
-def get_course_recommendations(target_role, user_id=None):
+def get_course_recommendations(target_role, user_id=None, resume_id=None):
     """
     Get recommended courses using the Snowflake Cortex Search query with specific service,
-    taking into account user's skill ratings if available.
+    taking into account either skill ratings or missing skills from resume analysis.
     
     Args:
         target_role (str): The target role to get course recommendations for
-        user_id (str/int, optional): The user ID to get skill ratings for personalization
+        user_id (str/int, optional): The user ID to get skill ratings from learning path
+        resume_id (str, optional): The resume ID to get missing skills from resume analysis
         
     Returns:
         DataFrame: A DataFrame containing course recommendations
@@ -43,12 +44,59 @@ def get_course_recommendations(target_role, user_id=None):
         service_name = 'SKILLPATH_SEARCH_POC'
         logger.info(f"Using search service: {service_name}")
         
-        # Get user's skill ratings if available
-        skill_ratings = {}
+        # Get missing skills or low-rated skills for query focus
         skill_query = ""
+        missing_skills = []
         
-        # If we have a user ID, try to get their skill ratings
-        if user_id:
+        # First try to get missing skills from resume if resume_id is provided
+        if resume_id:
+            try:
+                logger.debug(f"Fetching missing skills from resume ID: {resume_id}")
+                cur.execute(f"""
+                SELECT 
+                    TARGET_ROLE, MISSING_SKILLS
+                FROM 
+                    SKILLPATH_DB.PUBLIC.RESUMES 
+                WHERE 
+                    ID = '{resume_id}'
+                """)
+                
+                result = cur.fetchone()
+                if result and result[1]:  # Check if missing_skills exists and is not empty
+                    # The first element is target_role, the second is missing_skills
+                    missing_skills_data = result[1]
+                    target_role_from_db = result[0]
+                    
+                    # If target_role is supplied by query param, override the database value
+                    if not target_role and target_role_from_db:
+                        target_role = target_role_from_db
+                    
+                    logger.debug(f"Found missing skills: {missing_skills_data}")
+                    
+                    # Handle different types of missing_skills (object or string)
+                    try:
+                        # If it's already a list, use it directly
+                        if isinstance(missing_skills_data, list):
+                            missing_skills = missing_skills_data
+                        # If it's a string, try to parse it as JSON
+                        elif isinstance(missing_skills_data, str):
+                            missing_skills = json.loads(missing_skills_data)
+                        else:
+                            logger.warning(f"Unexpected missing_skills type: {type(missing_skills_data)}")
+                            missing_skills = []
+                        
+                        if missing_skills:
+                            skill_query = f" Focus on courses that teach {', '.join(missing_skills[:5])}."
+                            logger.debug(f"Added missing skills focus to query: {skill_query}")
+                    except Exception as e:
+                        logger.error(f"Error processing missing skills: {e}")
+                        # Continue without skill focus
+            except Exception as e:
+                logger.error(f"Error fetching missing skills from resume: {e}")
+                # Continue without missing skills if there's an error
+        
+        # If no missing skills found and user_id is provided, try skill ratings approach as fallback
+        if not missing_skills and user_id:
             try:
                 logger.debug(f"Fetching skill ratings for user ID: {user_id}")
                 cur.execute(f"""

@@ -128,6 +128,7 @@ class ChatService:
         prompt = (
             "Extract all technical skills, soft skills, and domain knowledge from the following resume. "
             "Return the result as a JSON list of strings containing only the skill names. "
+            "Be comprehensive and include all identifiable skills. "
             "Do not include explanations, categories, or any other text. Just the JSON list.\n\n"
             f"Resume text: {resume_text[:4000]}..."  # Truncate for token limits
         )
@@ -155,36 +156,116 @@ class ChatService:
                 
         except Exception as e:
             logger.error(f"❌ Error extracting skills with LLM: {str(e)}")
-            # Fallback to keyword matching
-            common_skills = ["Python", "Java", "JavaScript", "HTML", "CSS", "SQL", 
-                            "Machine Learning", "Data Analysis", "Project Management",
-                            "AWS", "Azure", "Docker", "Kubernetes", "React", "Angular",
-                            "Leadership", "Communication", "Problem Solving"]
-            
+            # Extract skills dynamically from resume text using contextual patterns
             extracted_skills = []
-            for skill in common_skills:
-                if skill.lower() in resume_text.lower():
-                    extracted_skills.append(skill)
             
-            return extracted_skills
+            # Look for skill sections
+            skill_sections = re.findall(r'(?i)(?:skills|technologies|competencies|proficiencies|tools)(?:[^\n.]*):([^\n]+(?:\n[^\n•*]+)*)', resume_text)
+            
+            for section in skill_sections:
+                # Extract individual skills by splitting on common delimiters
+                skills = re.findall(r'(?:[\s,;:|•]+)([A-Za-z0-9+#/\-._& ]{2,30}?)(?:[\s,;:|•]|$)', section)
+                extracted_skills.extend([s.strip() for s in skills if len(s.strip()) > 2])
+            
+            # Extract programming languages and technologies 
+            tech_pattern = r'\b(?:Python|Java|JavaScript|C\+\+|SQL|HTML|CSS|AWS|Azure|Docker|Kubernetes|Git|React|Angular|Vue|Node\.js|PHP|Ruby|Swift|Go|Rust|MongoDB|MySQL|PostgreSQL|TensorFlow|PyTorch|Pandas|NumPy)\b'
+            tech_skills = re.findall(tech_pattern, resume_text)
+            extracted_skills.extend(tech_skills)
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_skills = [skill for skill in extracted_skills if not (skill in seen or seen.add(skill))]
+            
+            return unique_skills
     
-    def generate_career_advice(self, current_skills, target_role):
+    def identify_missing_skills(self, current_skills, target_role):
         """
-        Generate personalized career advice for transitioning to a target role.
+        Dynamically identify missing skills for a target role without using hardcoded lists.
         
         Args:
             current_skills (list): List of current skills from resume
             target_role (str): Target role for career transition
             
         Returns:
-            str: Career advice in markdown format
+            list: Missing skills needed for the target role
         """
         prompt = (
+            f"You are a career coach with expertise in the {target_role} field in 2025. "
+            f"Given the candidate's current skills: {', '.join(current_skills)}, "
+            f"identify the specific top skills that are MISSING to be successful as a {target_role} in 2025. "
+            f"Focus on the most important skills that would have the highest impact on their career transition. "
+            f"Consider technical skills, tools, frameworks, and domain knowledge essential for this role. "
+            f"Return ONLY a JSON array of the missing skills, with no additional text or explanation. "
+            f"Include 5-10 specific, actionable skills that they need to learn."
+        )
+        
+        try:
+            response = self.get_llm_response(prompt)
+            
+            # Extract JSON list from response
+            import re
+            json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
+            
+            if json_match:
+                skills_json = f"[{json_match.group(1)}]"
+                missing_skills = json.loads(skills_json)
+                return missing_skills
+            else:
+                # Fallback extraction if JSON parsing fails
+                missing_skills = []
+                lines = response.split('\n')
+                for line in lines:
+                    # Look for skills in bullet points, numbered lists, or plain text
+                    if re.search(r'^[-•*\d.)\s]*([A-Za-z0-9+#/\-._& ]{2,30})', line):
+                        skill = re.sub(r'^[-•*\d.)\s]*', '', line).strip()
+                        if skill and not any(s in skill.lower() for s in ['following', 'missing', 'skills', 'learn']):
+                            missing_skills.append(skill)
+                
+                # Return unique skills
+                return list(set(missing_skills))
+        
+        except Exception as e:
+            logger.error(f"❌ Error identifying missing skills: {str(e)}")
+            # Generate a basic set of skills based on the target role name
+            role_words = target_role.lower().split()
+            
+            # Create contextual missing skills based on role name
+            missing_skills = []
+            
+            if any(word in role_words for word in ['data', 'scientist', 'analyst']):
+                missing_skills = ["Statistical Analysis", "Data Visualization", "Machine Learning"]
+            elif any(word in role_words for word in ['software', 'developer', 'engineer']):
+                missing_skills = ["System Design", "Code Optimization", "Testing Frameworks"]
+            elif any(word in role_words for word in ['embedded', 'hardware']):
+                missing_skills = ["Microcontroller Programming", "Firmware Development", "Real-time Systems"]
+            else:
+                missing_skills = ["Advanced Problem Solving", "Industry Knowledge", "Technical Communication"]
+                
+            return missing_skills
+    
+    def generate_career_advice(self, current_skills, target_role, missing_skills=None):
+        """
+        Generate personalized career advice for transitioning to a target role.
+        
+        Args:
+            current_skills (list): List of current skills from resume
+            target_role (str): Target role for career transition
+            missing_skills (list, optional): List of missing skills if already identified
+            
+        Returns:
+            str: Career advice in markdown format
+        """
+        # If missing skills not provided, identify them
+        if not missing_skills:
+            missing_skills = self.identify_missing_skills(current_skills, target_role)
+        
+        prompt = (
             f"You are a career coach helping someone transition to a {target_role} role. "
-            f"Their current skills are: {', '.join(current_skills)}. "
+            f"Their current skills are: {', '.join(current_skills[:10])}. "
+            f"They need to develop these skills: {', '.join(missing_skills)}. "
             "Provide detailed, personalized advice with the following sections:\n"
             "1. Skills Assessment: Evaluate their current skills relevant to the target role\n"
-            "2. Skills Gap: Identify key skills they need to develop\n"
+            "2. Skills Gap: Explain the importance of the missing skills for this role\n"
             "3. Learning Path: Recommend specific courses, resources, or training\n"
             "4. Project Ideas: Suggest portfolio projects to demonstrate new skills\n"
             "5. Networking: Tips for connecting with professionals in the target field\n\n"
@@ -201,8 +282,10 @@ class ChatService:
                 f"# Career Transition Plan: {target_role}\n\n"
                 f"## Skills Assessment\n"
                 f"You have some valuable skills that can help in your transition: {', '.join(current_skills[:5])}\n\n"
+                f"## Skills Gap\n"
+                f"You should focus on developing: {', '.join(missing_skills)}\n\n"
                 f"## Recommended Next Steps\n"
-                f"1. Consider taking courses in key technologies for {target_role}\n"
+                f"1. Consider taking courses on {', '.join(missing_skills[:3])}\n"
                 f"2. Build a portfolio of projects showing your abilities\n"
                 f"3. Network with professionals in this field\n"
                 f"4. Update your resume to highlight relevant experience\n"
