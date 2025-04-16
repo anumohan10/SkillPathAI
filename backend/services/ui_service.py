@@ -20,7 +20,7 @@ def format_course_message(courses_df, target_role):
     if courses_df.empty:
         return f"I couldn't find specific courses for {target_role} at this time. Please check with your administrator about updating the course database.", False
     
-    course_msg = f"# Data Engineer Learning Path\n\n"
+    course_msg = f"# {target_role} Learning Path\n\n"
     levels = ["BEGINNER", "INTERMEDIATE", "ADVANCED"]
     has_valid_courses = False
     
@@ -135,7 +135,7 @@ def format_introduction(target_role, skill_ratings):
         str: A markdown-formatted introduction
     """
     intro_text = f"""
-# 🚀 Your Personalized Data Engineering Learning Path
+# 🚀 Your Personalized Learning Path
 
 Based on your current skill assessment, I've curated courses that will help you advance your career as a **{target_role}**. These recommendations focus on strengthening your skills in:
 
@@ -148,29 +148,33 @@ Based on your current skill assessment, I've curated courses that will help you 
             intro_text += f"- **{skill}** ⭐⭐ (Focus area)\n"
     
     intro_text += """
-The learning path is organized from beginner to advanced courses, designed for completion within 6 months. Each course is chosen to address specific skill gaps and help you build a comprehensive foundation in data engineering.
+The learning path is organized from beginner to advanced courses, designed for completion within 6 months. Each course is chosen to address specific skill gaps and help you build a comprehensive foundation.
 
 ---
 
 """
     return intro_text
 
-def format_career_advice():
+def format_career_advice(target_role):
     """
     Format career advice for after completing the learning path.
     
+    Args:
+        target_role (str): The target role for the learning path
+        
     Returns:
         str: A markdown-formatted career advice message
     """
-    return """
+    
+    return f"""
 # 💼 Next Steps After Completing Your Learning Path
 
-Once you've completed the courses in your learning path, consider these steps to advance your career:
+Once you've completed the courses in your learning path, consider these steps to advance your career as a {target_role}:
 
-1. **Build a portfolio** - Create 2-3 data engineering projects demonstrating your skills with cloud platforms, data pipelines, and big data technologies
-2. **Get certified** - Pursue relevant certifications like Google Cloud Professional Data Engineer or AWS Data Analytics Specialty
-3. **Join communities** - Connect with other data professionals on forums like Stack Overflow, Reddit's r/dataengineering, or Meetup groups
-4. **Contribute to open source** - Participate in data engineering open source projects to gain recognition
+1. **Build a portfolio** - Create 2-3 {target_role} projects demonstrating your skills with relevant technologies
+2. **Get certified** - Pursue relevant certifications in your field
+3. **Join communities** - Connect with other professionals on forums like Stack Overflow or industry-specific communities
+4. **Contribute to open source** - Participate in open source projects related to your field to gain recognition
 
 Do you have any questions about your learning path or career next steps?
 """

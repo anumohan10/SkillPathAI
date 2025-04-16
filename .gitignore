@@ -3,3 +3,11 @@ venv/
 frontend/learning_path_debug.log
 CLAUDE.md
 frontend/career_transition_debug.log
+
+frontend/learning_path_debug.log
+*.pyc
+*.log
+__pycache__/
+backend/services/__pycache__
+frontend/learning_path_debug.log
+backend/services/__pycache__

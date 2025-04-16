@@ -2,9 +2,11 @@
 
 import json
 import logging
+import re
 from datetime import datetime
 from contextlib import contextmanager
 from backend.database import get_snowflake_connection
+from backend.services.connection_pool import ConnectionPool
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +18,7 @@ class ChatService:
     def __init__(self):
         """Initialize Snowflake connection for chat service."""
         self.conn = None
+        self.pool = ConnectionPool()
         self._connect()
     
     def _connect(self, retry_count=0):
@@ -23,11 +26,13 @@ class ChatService:
         try:
             if self.conn:
                 try:
-                    self.conn.close()
+                    # Release the connection back to the pool instead of closing
+                    self.pool.release_connection(self.conn)
                 except Exception:
                     pass
 
-            self.conn = get_snowflake_connection()
+            # Get a connection from the pool
+            self.conn = self.pool.get_connection()
             if self.conn:
                 logger.info("✅ Successfully connected to Snowflake for Chat Service")
             else:
@@ -64,6 +69,17 @@ class ChatService:
         except Exception:
             logger.info("🔄 Reconnecting to Snowflake...")
             self._connect()
+            
+    def __del__(self):
+        """Properly release connection when the object is deleted."""
+        if hasattr(self, 'conn') and self.conn:
+            try:
+                if hasattr(self, 'pool'):
+                    self.pool.release_connection(self.conn)
+                else:
+                    self.conn.close()
+            except Exception:
+                pass
     
     def get_llm_response(self, prompt, context=None, max_retries=2):
         """
@@ -125,58 +141,165 @@ class ChatService:
         Returns:
             list: Extracted skills 
         """
+        # More specific prompt for comprehensive skill extraction
         prompt = (
-            "Extract all technical skills, soft skills, and domain knowledge from the following resume. "
-            "Return the result as a JSON list of strings containing only the skill names. "
-            "Be comprehensive and include all identifiable skills. "
-            "Do not include explanations, categories, or any other text. Just the JSON list.\n\n"
-            f"Resume text: {resume_text[:4000]}..."  # Truncate for token limits
+            "You are an expert resume analyst in 2025 specializing in skill extraction. "
+            "Extract ALL technical skills, programming languages, tools, platforms, frameworks, "
+            "soft skills, and domain knowledge from the following resume text. "
+            "Be VERY COMPREHENSIVE and thorough - identify EVERY POSSIBLE skill mentioned. "
+            "Include both technical skills (like programming languages, tools, frameworks) "
+            "AND soft skills (like leadership, communication, problem-solving). "
+            "Return the result as a JSON list of strings containing ONLY the skill names. "
+            "Do not miss any skills, be extremely thorough. Format as a JSON array ONLY with no explanations or text. "
+            "\n\n"
+            f"Resume text: {resume_text[:5000]}..."  # Include more text for better analysis
         )
         
         try:
-            response = self.get_llm_response(prompt)
+            response = self.get_llm_response(prompt, max_retries=3)  # Increase retries for reliability
             
             # Extract JSON list from response 
-            # (handles cases where model might add explanatory text)
-            import re
             json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
             
             if json_match:
                 skills_json = f"[{json_match.group(1)}]"
-                skills = json.loads(skills_json)
+                try:
+                    skills = json.loads(skills_json)
+                    if skills and len(skills) >= 5:  # Ensure we have a reasonable number of skills
+                        return skills
+                except:
+                    pass  # If JSON parsing fails, fall through to backup methods
+            
+            # First backup: Extract skills line by line if JSON parsing fails
+            skills = []
+            for line in response.split('\n'):
+                line = line.strip().strip('"-,')
+                if line and not line.startswith('[') and not line.startswith(']'):
+                    # Clean up any quotes or list formatting
+                    cleaned_skill = re.sub(r'^[\s"\'•*-]*|[\s"\']*$', '', line)
+                    if cleaned_skill and len(cleaned_skill) > 2:
+                        skills.append(cleaned_skill)
+            
+            if skills and len(skills) >= 5:  # Ensure we have a reasonable number of skills
                 return skills
-            else:
-                # Fallback extraction if JSON parsing fails
-                skills = []
-                for line in response.split('\n'):
-                    line = line.strip().strip('"-,')
-                    if line and not line.startswith('[') and not line.startswith(']'):
-                        skills.append(line)
+            
+            # Second attempt with a simpler prompt if the first failed
+            simple_prompt = (
+                "List ALL skills mentioned in this resume. "
+                "Include technical skills, soft skills, and domain knowledge. "
+                "Format as a simple bullet list with one skill per line. Be comprehensive. "
+                f"\n\nResume: {resume_text[:5000]}..."
+            )
+            
+            response = self.get_llm_response(simple_prompt, max_retries=2)
+            skills = []
+            
+            # Process each line, looking for bullet points or numbered items
+            for line in response.split('\n'):
+                # Clean up bullet points and other formatting
+                cleaned_line = re.sub(r'^[\s•\-*0-9.]+|\s*:.*$', '', line).strip()
+                if cleaned_line and len(cleaned_line) > 2 and not cleaned_line.lower().startswith(('skill', 'here', 'these')):
+                    skills.append(cleaned_line)
+            
+            if skills and len(skills) >= 5:
                 return skills
                 
         except Exception as e:
             logger.error(f"❌ Error extracting skills with LLM: {str(e)}")
-            # Extract skills dynamically from resume text using contextual patterns
-            extracted_skills = []
+        
+        # Fallback: Extract skills from text using patterns
+        extracted_skills = []
+        
+        # Look for skill sections with broader pattern matching
+        skill_sections = re.findall(r'(?i)(?:skill|technolog|competenc|proficienc|tool|language|framework|platform)(?:[^\n.]*):([^\n]+(?:\n[^\n•*]+)*)', resume_text)
+        
+        for section in skill_sections:
+            # Extract individual skills by splitting on common delimiters
+            skills = re.findall(r'(?:[\s,;:|•]+)([A-Za-z0-9+#/\-._& ]{2,50}?)(?:[\s,;:|•]|$)', section)
+            extracted_skills.extend([s.strip() for s in skills if len(s.strip()) > 2])
+        
+        # List of common technical skills to look for
+        tech_skills = [
+            # Programming languages
+            'Python', 'Java', 'JavaScript', 'TypeScript', 'C++', 'C#', 'Go', 'Rust', 'PHP', 'Ruby', 'Swift', 
+            'Kotlin', 'Scala', 'R', 'MATLAB', 'Bash', 'Shell', 'SQL', 'PL/SQL', 'Assembly',
             
-            # Look for skill sections
-            skill_sections = re.findall(r'(?i)(?:skills|technologies|competencies|proficiencies|tools)(?:[^\n.]*):([^\n]+(?:\n[^\n•*]+)*)', resume_text)
+            # Web technologies
+            'HTML', 'CSS', 'React', 'Angular', 'Vue.js', 'Node.js', 'Express.js', 'jQuery', 'Bootstrap',
+            'REST API', 'GraphQL', 'JSON', 'XML', 'AJAX', 'WebSockets',
             
-            for section in skill_sections:
-                # Extract individual skills by splitting on common delimiters
-                skills = re.findall(r'(?:[\s,;:|•]+)([A-Za-z0-9+#/\-._& ]{2,30}?)(?:[\s,;:|•]|$)', section)
-                extracted_skills.extend([s.strip() for s in skills if len(s.strip()) > 2])
+            # Databases
+            'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'SQLite', 'Oracle', 'SQL Server', 'DynamoDB', 
+            'Cassandra', 'Elasticsearch', 'Neo4j', 'Firebase',
             
-            # Extract programming languages and technologies 
-            tech_pattern = r'\b(?:Python|Java|JavaScript|C\+\+|SQL|HTML|CSS|AWS|Azure|Docker|Kubernetes|Git|React|Angular|Vue|Node\.js|PHP|Ruby|Swift|Go|Rust|MongoDB|MySQL|PostgreSQL|TensorFlow|PyTorch|Pandas|NumPy)\b'
-            tech_skills = re.findall(tech_pattern, resume_text)
-            extracted_skills.extend(tech_skills)
+            # Cloud & DevOps
+            'AWS', 'Azure', 'Google Cloud', 'Kubernetes', 'Docker', 'Terraform', 'Jenkins', 'GitHub Actions',
+            'CI/CD', 'Ansible', 'Puppet', 'Chef', 'Prometheus', 'Grafana', 'ELK Stack',
             
-            # Remove duplicates while preserving order
-            seen = set()
-            unique_skills = [skill for skill in extracted_skills if not (skill in seen or seen.add(skill))]
+            # Data Science & ML
+            'Machine Learning', 'TensorFlow', 'PyTorch', 'Keras', 'scikit-learn', 'Pandas', 'NumPy',
+            'SciPy', 'Data Analysis', 'Data Visualization', 'Tableau', 'Power BI', 'Big Data',
+            'Natural Language Processing', 'Computer Vision',
             
-            return unique_skills
+            # Version Control
+            'Git', 'GitHub', 'GitLab', 'Bitbucket', 'Subversion',
+            
+            # Operating Systems
+            'Linux', 'Windows', 'macOS', 'UNIX', 'iOS', 'Android',
+            
+            # Finance
+            'Financial Analysis', 'Financial Modeling', 'Excel', 'Financial Statements', 'Accounting',
+            'Budgeting', 'Forecasting', 'Risk Management', 'Bloomberg Terminal', 'Capital Markets',
+            'Investment Banking', 'Corporate Finance', 'Financial Reporting', 'Valuation',
+            
+            # Soft Skills
+            'Leadership', 'Communication', 'Team Management', 'Problem-Solving', 'Critical Thinking',
+            'Project Management', 'Time Management', 'Collaboration', 'Adaptability', 'Analytical Thinking',
+            'Creativity', 'Decision Making', 'Conflict Resolution', 'Negotiation', 'Customer Service',
+            'Presentation', 'Research', 'Writing', 'Attention to Detail', 'Mentoring'
+        ]
+        
+        # Create a pattern that matches any of these skills (with word boundaries)
+        skills_pattern = r'\b(' + '|'.join(re.escape(skill) for skill in tech_skills) + r')\b'
+        found_tech_skills = set(re.findall(skills_pattern, resume_text, re.IGNORECASE))
+        
+        # Add extracted skills with proper casing from the original list
+        for skill in tech_skills:
+            if skill.lower() in (s.lower() for s in found_tech_skills):
+                extracted_skills.append(skill)
+        
+        # Add additional skills by looking for patterns in the text
+        # Look for specialized formats like "X years of experience with Y" or "Proficient in Z"
+        experience_patterns = [
+            r'(?:[\d+]+ years?(?:[^.]*?)(?:experience|expertise) (?:in|with) )([A-Za-z0-9+#/\-._& ]{2,30})',
+            r'(?:proficient in )([A-Za-z0-9+#/\-._& ]{2,30})',
+            r'(?:expertise in )([A-Za-z0-9+#/\-._& ]{2,30})',
+            r'(?:knowledge of )([A-Za-z0-9+#/\-._& ]{2,30})',
+            r'(?:familiar with )([A-Za-z0-9+#/\-._& ]{2,30})',
+            r'(?:experience (?:in|with) )([A-Za-z0-9+#/\-._& ]{2,30})',
+        ]
+        
+        for pattern in experience_patterns:
+            matches = re.findall(pattern, resume_text, re.IGNORECASE)
+            extracted_skills.extend([m.strip() for m in matches if len(m.strip()) > 2])
+        
+        # Extract skills that appear in sentence form in bullet points
+        bullet_points = re.findall(r'(?:^|\n)[•\-*]\s*([^\n]+)', resume_text)
+        for point in bullet_points:
+            potential_skills = re.findall(r'\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\b', point)
+            for skill in potential_skills:
+                if len(skill) > 3 and not skill.lower() in ('and', 'the', 'with', 'for', 'this', 'that'):
+                    extracted_skills.append(skill)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_skills = [skill for skill in extracted_skills if not (skill.lower() in seen or seen.add(skill.lower()))]
+        
+        # Clean up skills - remove any that are just common words or filler text
+        common_words = {'skills', 'experience', 'knowledge', 'years', 'proficient', 'expertise', 'with', 'and', 'the', 'for'}
+        filtered_skills = [skill for skill in unique_skills if skill.lower() not in common_words and len(skill) > 2]
+        
+        return filtered_skills
     
     def identify_missing_skills(self, current_skills, target_role):
         """
@@ -203,7 +326,6 @@ class ChatService:
             response = self.get_llm_response(prompt)
             
             # Extract JSON list from response
-            import re
             json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
             
             if json_match:
@@ -234,6 +356,8 @@ class ChatService:
             
             if any(word in role_words for word in ['data', 'scientist', 'analyst']):
                 missing_skills = ["Statistical Analysis", "Data Visualization", "Machine Learning"]
+            elif any(word in role_words for word in ['finance', 'financial', 'analyst']):
+                missing_skills = ["Financial Modeling", "Financial Analysis", "Excel", "Financial Statements", "Bloomberg Terminal"]
             elif any(word in role_words for word in ['software', 'developer', 'engineer']):
                 missing_skills = ["System Design", "Code Optimization", "Testing Frameworks"]
             elif any(word in role_words for word in ['embedded', 'hardware']):

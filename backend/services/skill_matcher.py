@@ -3,38 +3,106 @@ from typing import List, Dict, Any
 
 def extract_skills_from_text(text: str) -> List[str]:
     """
-    Extract skills from resume text using regex pattern matching.
-    This is a basic implementation - in production, you'd want to use NLP.
+    Extract skills from resume text using comprehensive regex pattern matching.
+    Enhanced version with more comprehensive skill categories.
     """
-    # Common skills dictionary with categories
+    # More comprehensive skills dictionary with expanded categories
     skills_dict = {
         "Programming Languages": [
             "Python", "Java", "JavaScript", "C\\+\\+", "C#", "Ruby", "PHP", "Swift", "Kotlin", 
-            "TypeScript", "Go", "Rust", "Scala", "Perl", "R", "MATLAB"
+            "TypeScript", "Go", "Rust", "Scala", "Perl", "R", "MATLAB", "Shell", "Bash", 
+            "PowerShell", "Groovy", "VBA", "Objective-C", "Assembly", "Fortran", "COBOL", 
+            "Lisp", "Haskell", "Clojure", "F#", "Dart", "Lua", "Delphi", "ABAP", "PL/SQL", "T-SQL"
         ],
         "Web Development": [
             "HTML", "CSS", "React", "Angular", "Vue", "Node.js", "Express", "Django", "Flask",
-            "Spring Boot", "ASP.NET", "jQuery", "Bootstrap", "Tailwind", "WordPress"
+            "Spring Boot", "ASP.NET", "jQuery", "Bootstrap", "Tailwind", "WordPress",
+            "Next.js", "Gatsby", "Svelte", "Ember", "Laravel", "Ruby on Rails", "Symfony",
+            "GraphQL", "REST API", "SOAP", "WebSockets", "PWA", "AJAX", "JSON", "XML",
+            "Microservices", "Service Oriented Architecture", "Web Components", "SSR", "SEO",
+            "Web Accessibility", "WCAG", "Web Performance", "Web Security"
         ],
         "Databases": [
             "SQL", "MySQL", "PostgreSQL", "MongoDB", "Oracle", "SQLite", "Redis", "Cassandra",
-            "DynamoDB", "Elasticsearch", "MariaDB", "Firebase"
+            "DynamoDB", "Elasticsearch", "MariaDB", "Firebase", "Neo4j", "CouchDB", "Teradata",
+            "Snowflake", "Microsoft SQL Server", "IBM Db2", "SAP HANA", "Amazon RDS", "Amazon Redshift",
+            "Google BigQuery", "Apache HBase", "Apache Druid", "InfluxDB", "Supabase",
+            "Database Design", "Database Administration", "Database Optimization",
+            "NoSQL", "OLAP", "OLTP", "ETL", "Data Warehousing", "Data Modeling"
         ],
         "Cloud & DevOps": [
             "AWS", "Azure", "Google Cloud", "Docker", "Kubernetes", "Jenkins", "Git", "GitHub",
-            "CI/CD", "Terraform", "Ansible", "Chef", "Puppet", "Nginx", "Apache"
+            "CI/CD", "Terraform", "Ansible", "Chef", "Puppet", "Nginx", "Apache", "IaC",
+            "GitLab", "Bitbucket", "CircleCI", "Travis CI", "GitHub Actions", "ArgoCD", "Helm",
+            "Prometheus", "Grafana", "ELK Stack", "Datadog", "CloudWatch", "Splunk", "New Relic",
+            "SRE", "DevSecOps", "Cloud Architecture", "Serverless", "Lambda", "Microservices",
+            "Service Mesh", "Istio", "Linkerd", "Envoy", "Vault", "Consul", "Load Balancing",
+            "Auto Scaling", "High Availability", "Disaster Recovery", "Configuration Management"
         ],
         "Data Science": [
             "Machine Learning", "Deep Learning", "NLP", "Computer Vision", "Data Analysis",
             "Pandas", "NumPy", "SciPy", "Scikit-learn", "TensorFlow", "PyTorch", "Keras",
-            "Data Visualization", "Tableau", "Power BI", "Statistics"
+            "Data Visualization", "Tableau", "Power BI", "Statistics", "A/B Testing",
+            "Data Mining", "Predictive Modeling", "Neural Networks", "Feature Engineering",
+            "Transfer Learning", "Reinforcement Learning", "Unsupervised Learning",
+            "Time Series Analysis", "Clustering", "Classification", "Regression",
+            "Random Forest", "Decision Trees", "Support Vector Machines",
+            "Big Data", "Apache Spark", "Apache Hadoop", "Apache Flink", "Apache Kafka",
+            "Data Pipelines", "ETL", "Data Lakes", "Data Warehousing", "Data Governance"
         ],
-        "Business Skills": [
+        "Finance & Accounting": [
+            "Financial Analysis", "Financial Modeling", "Financial Reporting", "Forecasting",
+            "Budgeting", "Excel", "Accounting", "Cost Accounting", "Managerial Accounting",
+            "Financial Statements", "Balance Sheet", "Income Statement", "Cash Flow", "Auditing",
+            "Taxation", "Forensic Accounting", "Corporate Finance", "Investment Banking",
+            "Capital Markets", "Investment Management", "Portfolio Management", "Risk Management",
+            "Financial Regulations", "GAAP", "IFRS", "FP&A", "Market Analysis",
+            "Equity Research", "Valuation", "M&A", "Business Valuation", "Financial Strategy",
+            "Asset Management", "Wealth Management", "Private Equity", "Venture Capital",
+            "Bloomberg Terminal", "Reuters Eikon", "FactSet", "Capital IQ", "QuickBooks",
+            "SAP Finance", "Oracle Financials", "Financial Planning", "Tax Planning",
+            "Financial Controls", "Treasury Management", "Credit Analysis", "Loan Management"
+        ],
+        "Business & Management": [
             "Project Management", "Product Management", "Agile", "Scrum", "Leadership",
             "Communication", "Presentation", "Negotiation", "Customer Service", "Sales",
-            "Marketing", "Business Analysis", "Strategic Planning"
+            "Marketing", "Business Analysis", "Strategic Planning", "Process Improvement",
+            "Lean", "Six Sigma", "Kanban", "JIRA", "Trello", "Asana", "MS Project",
+            "Business Development", "Client Relationship Management", "Stakeholder Management",
+            "Team Management", "Performance Management", "Conflict Resolution", "Delegation",
+            "Decision Making", "Problem Solving", "Critical Thinking", "Analytical Thinking",
+            "Change Management", "Organizational Development", "Operations Management",
+            "Supply Chain Management", "Logistics", "Inventory Management", "Procurement",
+            "Quality Management", "Business Intelligence", "Competitive Analysis",
+            "Market Research", "Customer Insights", "User Experience", "User Interface Design",
+            "Product Development", "Product Strategy", "Go-to-Market Strategy"
+        ],
+        "Soft Skills": [
+            "Communication", "Teamwork", "Problem Solving", "Critical Thinking", "Analytical Skills",
+            "Attention to Detail", "Time Management", "Organization", "Adaptability", "Flexibility",
+            "Creativity", "Innovation", "Leadership", "Management", "Mentoring", "Coaching",
+            "Conflict Resolution", "Negotiation", "Persuasion", "Presentation Skills",
+            "Public Speaking", "Writing", "Active Listening", "Interpersonal Skills",
+            "Emotional Intelligence", "Resilience", "Self-Motivation", "Work Ethic",
+            "Decision Making", "Collaboration", "Cross-Cultural Communication",
+            "Customer Service", "Client Relationship", "Strategic Planning", "Initiative",
+            "Cultural Awareness", "Networking", "Research", "Self-Learning"
         ]
     }
+    
+    # Additional finance-specific skills
+    if "finance" in text.lower() or "accounting" in text.lower() or "financial" in text.lower():
+        skills_dict["Finance Technical"] = [
+            "Financial Modeling", "Discounted Cash Flow", "Net Present Value", "Internal Rate of Return",
+            "Balance Sheet Analysis", "Income Statement Analysis", "Cash Flow Analysis", "Ratio Analysis",
+            "Variance Analysis", "Cost-Benefit Analysis", "Break-Even Analysis", "Sensitivity Analysis",
+            "Scenario Analysis", "Monte Carlo Simulation", "Options Pricing", "Derivatives", "Hedging",
+            "Asset Pricing", "CAPM", "Arbitrage Pricing Theory", "Factor Models", "Value at Risk",
+            "Portfolio Optimization", "Modern Portfolio Theory", "Fixed Income Analysis",
+            "Financial Statement Modeling", "Three Statement Model", "LBO Modeling", "M&A Modeling",
+            "Credit Analysis", "Risk Assessment", "Economic Capital", "Regulatory Capital",
+            "Basel Accords", "Stress Testing", "Financial Forecasting", "Budget Planning", "P&L Management"
+        ]
     
     # Flatten the skills list
     all_skills = [skill for category in skills_dict.values() for skill in category]
@@ -45,9 +113,76 @@ def extract_skills_from_text(text: str) -> List[str]:
         # Look for word boundaries to avoid partial matches
         pattern = r'\b' + skill + r'\b'
         if re.search(pattern, text, re.IGNORECASE):
+            # Use the proper case from the dictionary
             extracted_skills.append(skill)
     
-    return extracted_skills
+    # Look for skill sections in the text to extract additional skills
+    skill_section_patterns = [
+        r'(?i)skills(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)technical skills(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)software(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)technologies(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)tools(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)languages(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)frameworks(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)proficiencies(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)expertise(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)',
+        r'(?i)competencies(?:[^\n.]*?)[:](.*?)(?:\n\n|\n\w+:|\Z)'
+    ]
+    
+    for pattern in skill_section_patterns:
+        matches = re.findall(pattern, text, re.DOTALL)
+        for match in matches:
+            # Split by common delimiters and clean up
+            skill_candidates = re.split(r'[,;•·|\n]', match)
+            for candidate in skill_candidates:
+                # Clean up the candidate
+                candidate = candidate.strip()
+                # Check if it's a reasonable skill (not too short/long, not just numbers)
+                if len(candidate) > 2 and len(candidate) < 50 and not candidate.isdigit():
+                    # Avoid obvious non-skills like pronouns, articles, etc.
+                    if not candidate.lower() in ["and", "the", "a", "an", "in", "of", "with", "to", "for"]:
+                        extracted_skills.append(candidate)
+    
+    # Look for phrases like "X years of experience in Y" or "proficient in Z"
+    experience_patterns = [
+        r'(?:[\d+]+ years?(?:[^.]*?)(?:experience|expertise) (?:in|with) )([A-Za-z0-9+#/\-._& ]{2,30})',
+        r'(?:proficient in )([A-Za-z0-9+#/\-._& ]{2,30})',
+        r'(?:expertise in )([A-Za-z0-9+#/\-._& ]{2,30})',
+        r'(?:knowledge of )([A-Za-z0-9+#/\-._& ]{2,30})',
+        r'(?:familiar with )([A-Za-z0-9+#/\-._& ]{2,30})',
+        r'(?:experience (?:in|with) )([A-Za-z0-9+#/\-._& ]{2,30})',
+    ]
+    
+    for pattern in experience_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        for match in matches:
+            if len(match) > 2 and not match.isdigit():
+                extracted_skills.append(match.strip())
+    
+    # Look for capitalized multi-word terms (often skills)
+    capital_word_skills = re.findall(r'\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)+)\b', text)
+    for skill in capital_word_skills:
+        if len(skill) > 3 and not skill.lower() in ["and", "the", "of", "in", "with", "for"]:
+            extracted_skills.append(skill)
+    
+    # Remove duplicates while preserving original case
+    seen = set()
+    unique_skills = []
+    for skill in extracted_skills:
+        if skill.lower() not in seen:
+            seen.add(skill.lower())
+            unique_skills.append(skill)
+    
+    # Filter out common false positives
+    common_false_positives = {"skills", "experience", "knowledge", "years", "proficient", 
+                              "expertise", "with", "and", "the", "for", "of", "in", "to",
+                              "skills include", "following", "various", "including"}
+    
+    filtered_skills = [skill for skill in unique_skills 
+                      if skill.lower() not in common_false_positives and len(skill) > 2]
+    
+    return filtered_skills
 
 def get_job_requirements(role: str) -> Dict[str, List[str]]:
     """

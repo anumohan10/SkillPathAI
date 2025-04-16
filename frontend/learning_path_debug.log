@@ -1,0 +1,2 @@
+2025-04-16 17:52:31,728 - fsevents - DEBUG - NativeEvent(path="/Users/divyakasa/Desktop/MLDS/SkillPathAI/frontend/learning_path_debug.log", inode=47095523, flags=11400, id=74821279): is_file, is_inode_meta_mod, is_modified
+2025-04-16 17:52:31,729 - fsevents - DEBUG - queue_event FileModifiedEvent(src_path='/Users/divyakasa/Desktop/MLDS/SkillPathAI/frontend/learning_path_debug.log', dest_path='', event_type='modified', is_directory=False, is_synthetic=False)

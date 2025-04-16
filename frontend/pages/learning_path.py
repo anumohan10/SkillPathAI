@@ -271,6 +271,7 @@ def learning_path_chat():
                 st.session_state.lp_data["current_skill_index"] = index + 1
                 st.session_state.lp_state = "rate_skills"
                 st.rerun()
+                
             else:
                 # If all skills are rated, move to generating courses
                 st.session_state.lp_state = "generate_courses"
@@ -323,9 +324,86 @@ def learning_path_chat():
             # Get recommended courses with user skill data if available
             try:
                 debug_container.write("Attempting to get course recommendations...")
-                courses_df = get_course_recommendations(target_role, user_id)
-                debug_container.write(f"Retrieved {len(courses_df)} course recommendations")
+                
+                # Get skill data for better course recommendations
+                user_id = st.session_state.lp_data.get("record_id")
+                skill_ratings = st.session_state.lp_data.get("skill_ratings", {})
+                
+                # Extract low-rated skills that need improvement for focused course search
+                missing_skills = []
+                for skill, rating in skill_ratings.items():
+                    if rating <= 2:  # Skills rated 1-2 are considered priorities to learn
+                        missing_skills.append(skill)
+                
+                # Use dedicated learning path course service to avoid conflicts with career transition
+                courses_df = pd.DataFrame()
+                
+                # 1. First try dedicated learning path course service
+                debug_container.write("Attempt 1: Using learning_path_courses service...")
+                try:
+                    from backend.services.learning_path_courses import get_learning_path_courses
+                    courses_df = get_learning_path_courses(target_role, skill_ratings)
+                    if not courses_df.empty:
+                        debug_container.success(f"Found {len(courses_df)} course recommendations using learning_path_courses")
+                except Exception as e1:
+                    debug_container.error(f"Error with learning_path_courses: {str(e1)}")
+                
+                # 2. If still empty, try original course service as backup
+                if courses_df.empty:
+                    debug_container.write("Attempt 2: Using course_service as backup...")
+                    try:
+                        courses_df = get_course_recommendations(target_role, user_id)
+                        if not courses_df.empty:
+                            debug_container.success(f"Found {len(courses_df)} course recommendations using course_service")
+                    except Exception as e2:
+                        debug_container.error(f"Error with course_service: {str(e2)}")
+                
+                # 3. If still empty, use dedicated learning path fallback courses
+                if courses_df.empty:
+                    debug_container.write("Attempt 3: Using learning path fallback courses...")
+                    try:
+                        from backend.services.learning_path_courses import get_fallback_courses_for_learning_path
+                        courses_df = get_fallback_courses_for_learning_path(target_role, skill_ratings)
+                        debug_container.success(f"Using {len(courses_df)} learning path fallback courses")
+                    except Exception as e3:
+                        debug_container.error(f"Error with learning path fallback courses: {str(e3)}")
+                
+                # Distribute courses if we have them
+                if not courses_df.empty:
+                    # Check course level distribution
+                    beginner_count = len(courses_df[courses_df['LEVEL_CATEGORY'] == 'BEGINNER'])
+                    intermediate_count = len(courses_df[courses_df['LEVEL_CATEGORY'] == 'INTERMEDIATE'])
+                    advanced_count = len(courses_df[courses_df['LEVEL_CATEGORY'] == 'ADVANCED'])
+                    
+                    debug_container.write(f"Course distribution: Beginner={beginner_count}, Intermediate={intermediate_count}, Advanced={advanced_count}")
+                    
+                    # Ensure we have courses at all levels
+                    all_levels = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED']
+                    for level in all_levels:
+                        if len(courses_df[courses_df['LEVEL_CATEGORY'] == level]) == 0:
+                            debug_container.warning(f"No courses found for {level} level. Will redistribute.")
+                            
+                            # Find most populated level to take courses from
+                            level_counts = {
+                                'BEGINNER': beginner_count,
+                                'INTERMEDIATE': intermediate_count,
+                                'ADVANCED': advanced_count
+                            }
+                            source_level = max(level_counts, key=level_counts.get)
+                            
+                            # Only redistribute if we have courses to move
+                            if level_counts[source_level] >= 2:
+                                courses_to_move = courses_df[courses_df['LEVEL_CATEGORY'] == source_level].iloc[0:1]
+                                if not courses_to_move.empty:
+                                    # Update the level for these courses
+                                    for idx in courses_to_move.index:
+                                        courses_df.at[idx, 'LEVEL_CATEGORY'] = level
+                                        debug_container.success(f"Moved course '{courses_df.at[idx, 'COURSE_NAME']}' from {source_level} to {level}")
+                
+                # Store the courses in session state
+                debug_container.write(f"Final course count: {len(courses_df)}")
                 st.session_state.lp_data["courses"] = courses_df
+                
             except Exception as e:
                 debug_container.error(f"Error retrieving courses: {str(e)}")
                 st.session_state.lp_data["courses"] = pd.DataFrame()
@@ -364,7 +442,7 @@ def learning_path_chat():
                 add_message("assistant", course_msg)  # This will contain the error message
             
             # Add career advice from our UI service
-            career_advice = format_career_advice()
+            career_advice = format_career_advice(target_role)
             add_message("assistant", career_advice)
             
             # Mark as displayed
@@ -389,6 +467,8 @@ def learning_path_chat():
                 # Use answer_career_question method to get more focused responses
                 chat_service = ChatService()
                 followup_response = chat_service.answer_career_question(user_input, user_context)
+                # Let the connection pool handle connections properly via __del__ method
+                # No need to explicitly close connections here
                 add_message("assistant", followup_response)
             except Exception as e:
                 debug_container.error(f"Error generating response: {str(e)}")

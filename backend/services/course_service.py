@@ -157,6 +157,11 @@ def get_course_recommendations(target_role, user_id=None, resume_id=None):
           CASE
             WHEN LOWER(course.value:"LEVEL"::string) LIKE '%beginner%' THEN 'BEGINNER'
             WHEN LOWER(course.value:"LEVEL"::string) LIKE '%intermediate%' THEN 'INTERMEDIATE'
+            WHEN LOWER(course.value:"LEVEL"::string) LIKE '%advanced%' THEN 'ADVANCED'
+            -- For "All Levels" courses, initially categorize them separately
+            WHEN LOWER(course.value:"LEVEL"::string) LIKE '%all%level%' 
+              OR LOWER(course.value:"LEVEL"::string) LIKE '%all-level%' THEN 'ALL_LEVELS'
+            -- For other uncategorized courses, use ADVANCED as default
             ELSE 'ADVANCED'
           END AS LEVEL_CATEGORY
         FROM
@@ -203,6 +208,47 @@ def get_course_recommendations(target_role, user_id=None, resume_id=None):
         if df.empty:
             logger.error("Empty DataFrame after creating from query results")
             raise ValueError("No valid course data found")
+        
+        # Distribute "ALL_LEVELS" courses among BEGINNER, INTERMEDIATE, and ADVANCED
+        all_levels_courses = df[df['LEVEL_CATEGORY'] == 'ALL_LEVELS']
+        if not all_levels_courses.empty:
+            logger.info(f"Distributing {len(all_levels_courses)} 'ALL_LEVELS' courses across difficulty levels")
+            
+            # Count how many we have in each category
+            beginner_count = len(df[df['LEVEL_CATEGORY'] == 'BEGINNER'])
+            intermediate_count = len(df[df['LEVEL_CATEGORY'] == 'INTERMEDIATE'])
+            advanced_count = len(df[df['LEVEL_CATEGORY'] == 'ADVANCED'])
+            
+            # Create a copy to avoid modifying during iteration
+            for index, course in all_levels_courses.iterrows():
+                course_name = course.get('COURSE_NAME', '').lower()
+                description = course.get('DESCRIPTION', '').lower()
+                
+                # Check for beginner indicators
+                beginner_indicators = ["intro", "beginning", "basic", "fundamental", "foundation", "start"]
+                advanced_indicators = ["advanced", "expert", "mastery", "professional", "master"]
+                
+                # First try to assign based on course name/description
+                if any(word in course_name for word in beginner_indicators):
+                    df.at[index, 'LEVEL_CATEGORY'] = 'BEGINNER'
+                    beginner_count += 1
+                elif any(word in course_name for word in advanced_indicators):
+                    df.at[index, 'LEVEL_CATEGORY'] = 'ADVANCED'
+                    advanced_count += 1
+                else:
+                    # Assign to category with fewest courses
+                    if beginner_count <= intermediate_count and beginner_count <= advanced_count:
+                        df.at[index, 'LEVEL_CATEGORY'] = 'BEGINNER'
+                        beginner_count += 1
+                    elif intermediate_count <= beginner_count and intermediate_count <= advanced_count:
+                        df.at[index, 'LEVEL_CATEGORY'] = 'INTERMEDIATE'
+                        intermediate_count += 1
+                    else:
+                        df.at[index, 'LEVEL_CATEGORY'] = 'ADVANCED'
+                        advanced_count += 1
+            
+            # Log the distribution
+            logger.info(f"After distribution: BEGINNER={beginner_count}, INTERMEDIATE={intermediate_count}, ADVANCED={advanced_count}")
         
         # Log the data for debugging
         if not df.empty:
