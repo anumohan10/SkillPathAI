@@ -384,7 +384,7 @@
     "Skills": "Vectors, Retrieval-Augmented Generation, OpenAI API, LangChain, Image pre-processing, Transfer learning, Word embeddings, Ethical AI, Diffusion Models, Yolo algorithm, Model evaluation, Text generation, Computer vision fluency, Image classification, Large Language Models, Pandas, Image generation, Training neural networks, Convolutional neural networks, Parameter-Efficient Fine-Tuning, Image segmentation, Computer Vision Transformers, Tokenization, Data quality assessment, Generative adversarial networks, Together AI API, Search implementation in Python, NLP transformers, GPT, Selenium, Data cleaning, Natural language processing, Bert, Transformer neural networks, Prompt Engineering, PyTorch, Cosine, API requests, Recurrent neural networks, Attention mechanisms, Beautifulsoup, Data scraping, Generative AI Fluency, Hugging Face, Deep learning, Foundation Models",
     "Rating": 5
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/discovering-data-science--cd2018",
     "Course Name": "Discovering Data Science Course",
@@ -572,7 +572,7 @@
     "Skills": "Power BI Report Customization, Data visualization design, Dax, Data transformation, Power query, Power BI Report Design, Data fluency, Advanced data visualizations, Business reporting fluency, Relational data models, Power BI Calculated Columns and Measures, Data extraction, Predictive analytics, Historical data analysis, Stakeholder management, Basic descriptive statistics, Data storytelling, Basic data visualizations, Data visualization, Business metrics, Power BI Data Types, Power BI Get Data, Power BI Data Pipeline, Table design",
     "Rating": 4.6
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/discovering-digital-transformation--cd2704",
     "Course Name": "Discovering Digital Transformation Course",
@@ -804,7 +804,7 @@
     "Skills": "Data Analysis Awareness",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/how-to-use-chatgpt--cd13054",
     "Course Name": "How to Use ChatGPT Course",
@@ -1069,7 +1069,7 @@
     "Skills": "Report writing, Cybersecurity reconnaissance, Open-source intelligence, Owasp wstg, Digital footprint removal, Password attacks, Osint tools, Vulnerability management, Exploit code execution, Metasploit, Link analysis, Open source vulnerability database, Digital footprint analysis, SQL injection, Cybersecurity pivoting, Web hacking, Cherrytree, Backdoors, Passive cybersecurity reconnaissance, Vulnerability assessment, Social engineering, Phishing, Gophish, Security risk classification, Nessus, Security assessment, On-premise cyber attacks, Service enumeration, Advanced persistent threat, Steganography, Owasp zap, Active cybersecurity reconnaissance, Data exfiltration, Nmap, Dig, Router hacking, Privilege escalation, Traceroute, Dirb, Netdiscover, Red teaming, Port scanning, Nslookup, John the ripper, Wpscan, Cyber attack persistence, Keystroke logging, Port forwarding, Web application vulnerability scanning, Vulnerability exploitation, Cvss, Hash cat, Vulnerability scanning, Exploitdb, Veil-evasion, Burp suite, Google hacking, Cybersecurity ttps, SQLmap, Maltego, Malware development, Automated penetration testing, Semi-automated penetration testing, Exploratory data analysis, Nikto, Vulnerability research",
     "Rating": 4.1
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/ai-trading-strategies--nd881",
     "Course Name": "AI Trading Strategies Nanodegree Program",
@@ -1323,7 +1323,7 @@
     "Skills": "Product Management Awareness",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/digital-project-management-fluency--cd5231",
     "Course Name": "Digital Project Management Fluency Course",
@@ -1588,7 +1588,7 @@
     "Skills": "AI Governance, Model bias analysis, Ethical AI, Explainable AI, AI Fairness, AI Transparency, Model bias mitigation",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/building-a-continuous-integration-pipeline--cd12354",
     "Course Name": "Build CI/CD Pipelines, Monitoring, and Logging Course",
@@ -1853,7 +1853,7 @@
     "Skills": "Digital Marketing Fluency",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/embedded-systems-fundamentals--nd790",
     "Course Name": "Embedded Systems Fundamentals Nanodegree Program",
@@ -2118,7 +2118,7 @@
     "Skills": "Object-oriented Python, Python data structures, Text processing in Python, Python classes, API requests, Python methods, JSON, Python exception handling, Python lists, Computer memory architecture",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/data-privacy--cd1826",
     "Course Name": "Data Privacy Course",
@@ -2383,7 +2383,7 @@
     "Skills": "Big data fluency, Distributed data processing, Data lake management, Database fundamentals, Database scalability, Hdfs, Data format fundamentals, NoSQL, Hadoop, Database frameworks, Data lake design patterns, NoSQL data models, Data lakes, Acid properties, Distributed data storage, Amazon DynamoDB, Cap theorem, Big data business context",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/java-script-and-the-dom--cd0428",
     "Course Name": "JavaScript and the DOM Course",
@@ -2648,7 +2648,7 @@
     "Skills": "Search engine optimization, SEO audits, Link building, Keyword lists",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/modernizing-and-optimizing-architecture--cd13809",
     "Course Name": "Modernizing and Optimizing Architecture Course",
@@ -2913,7 +2913,7 @@
     "Skills": "Agile metrics, Continuous improvement, Agile communication, Sprint retrospectives, Big visible information radiator, Agile governance, Technical debt management, Project risk mitigation, Agile velocity, Agile fluency",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/leveraging-data-with-AI--cd13580",
     "Course Name": "Leveraging Data with AI Course",
@@ -3178,7 +3178,7 @@
     "Skills": "Azure cognitive services, Microsoft bot framework, Azure conversational ai agents, Requirements gathering, Key phrase extraction, Entity recognition, Azure text analytics, Sentiment analysis, Ethical AI, Basic github, Azure conversational ai, NLP business context, Intent recognition, CI/CD",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/security-architecture-planning-and-design--cd0394",
     "Course Name": "Security Architecture Planning and Design Course",
@@ -3443,7 +3443,7 @@
     "Skills": "Network security fundamentals, Did framework, Togaf framework, Cybersecurity incident response playbooks, Zachman framework, Cybersecurity APIs, Antivirus definition update pipelines, Intelligence-driven security, Clam antivirus, Threat modeling, Security services integration, Threat-driven security, Stride framework, Cybersecurity alert enrichment, Webhook security alerts, Scalable security services, Mitre att&ck, Cyber kill chain model, Threat profiling",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/web-design--cd12760",
     "Course Name": "Web Design Course",
@@ -3708,7 +3708,7 @@
     "Skills": "DaVinci Resolve, Digital Video Editing",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/linear-algebra-essentials--cd0667",
     "Course Name": "Linear Algebra Essentials Course",
@@ -3973,7 +3973,7 @@
     "Skills": "Zero trust security model, Secure network architecture design, Security information and event management, Soar platforms, Ioc management, Cybersecurity incident response playbooks, Sabsa framework, Did framework, Network segmentation, Azure architecture, VPN, Network topologies, It continuous monitoring, Security devices, Network security with Azure",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/elements-of-design-and-composition--cd12756",
     "Course Name": "Elements of Design and Composition  Course",
@@ -4238,7 +4238,7 @@
     "Skills": "Basic computer literacy, Computer Programming Awareness",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/raster-design--cd12758",
     "Course Name": "Raster Design Course",
@@ -4455,7 +4455,7 @@
   {
     "URL": "https://www.udacity.com/school/programming"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/developing-android-apps-with-kotlin--ud9012",
     "Course Name": "Developing Android Apps with Kotlin Free Course",
@@ -4696,7 +4696,7 @@
     "Skills": "",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/object-oriented-programming-in-java--ud283",
     "Course Name": "Object Oriented Programming in Java Free Course",
@@ -4961,7 +4961,7 @@
     "Skills": "Toil reduction, Data recovery, Site reliability engineering business context, Deployment automation, Terraform, Prometheus, Data replication, Service level objectives, Cloud availability, Disaster recovery plans, Reliability risk assessment, Feature launch reviews, Cloud capacity management, Rolling deployments, AWS autoscaling, It incident management, Deployment rollbacks, Canary deployment, On-call best practices, Feature design documents, Cloud autoscaling, Basic deployments, Kubernetes scaling, Tiered cloud capacity management, Blue-green deployment, Microservices architecture design, Cloud capacity planning, Self-healing system design, As-built documents, It incident postmortems, Cloud load balancing, Software load testing, Database backup automation, Database geo-replication, It asset inventories, Log shipping, Service level indicators, It asset consolidation, Service level metrics, Regional cloud asset deployment, Cloud asset deployment, Service level dashboards, Grafana, Application monitoring, Building site reliability engineering teams, Webhook alerts, Synthetic monitoring, Team SWOT analysis, Observability dashboards, Cost-benefit analysis, Site reliability metrics, Cross-functional collaboration, Site reliability engineering best practices",
     "Rating": 4.5
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/configuring-linux-web-servers--ud299",
     "Course Name": "Configuring Linux Web Servers Free Course",
@@ -5218,7 +5218,7 @@
     "Skills": "",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/advanced-android-with-kotlin--ud940",
     "Course Name": "Advanced Android with Kotlin Free Course",
@@ -5467,7 +5467,7 @@
     "Skills": "Optimization algorithms, Likelihood function, Minimax search, Bayesian networks, First order logic, Constraint propagation, Constraint satisfaction problems, Part of speech tagging, Basic probability, Ibm watson, Viterbi algorithm, Hidden markov models, Text pre-processing, Baum-welch algorithm, Time-series analysis with ML, State space search, Multi-agent training, Simulated annealing, A* search algorithm, Uninformed search, Search algorithms, Hill climbing, Search implementation in Python, Informed search, Automated planning problem definition, Propositional logic, Planning algorithms, Automated planning heuristics, Planning graphs, Backtracking search, AI algorithms in Python, Uniform cost search, Algorithmic problem solving, Breadth-first search, Heuristic evaluations, Depth-first search",
     "Rating": 4.5
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/classification-models--ud978",
     "Course Name": "Classification Models Free Course",
@@ -5724,7 +5724,7 @@
     "Skills": "",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/deploying-applications-with-heroku--ud272",
     "Course Name": "Deploying Web Applications with Heroku Free Course",
@@ -5989,7 +5989,7 @@
     "Skills": "",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/mobile-design-and-usability-for-ios--ud1034",
     "Course Name": "Mobile Design and Usability for iOS Free Course",
@@ -6246,7 +6246,7 @@
     "Skills": "",
     "Rating": "N/A"
   }
-][
+,
   {
     "URL": "https://www.udacity.com/course/operationalizing-cloud-security-with-deepfence-threatmapper--cd12926",
     "Course Name": "Operationalizing Cloud Security with Deepfence ThreatMapper Course",
@@ -6510,8 +6510,7 @@
     "Language": "en",
     "Skills": "",
     "Rating": "N/A"
-  }
-][
+  },
   {
     "URL": "https://www.udacity.com/course/modernize-infrastructure-and-applications-with-google-cloud--cd13563",
     "Course Name": "Modernize Infrastructure and Applications with Google Cloud Course",
