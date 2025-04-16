@@ -1,0 +1,71 @@
+/* styles.css */
+h1, h2, h3, h4, h5, h6 {
+    color: #1468D7 !important;
+    font-weight: 600;
+}
+
+/* General text color, but exclude elements inside buttons */
+p:not(.stButton *), div:not(.stButton *), span:not(.stButton *), label:not(.stButton *) {
+    color: #000000 !important;
+}
+
+.stButton>button {
+    background-color: #1468D7 !important;
+    color: #FFFFFF !important; /* White text for all buttons */
+    border-radius: 5px;
+    border: none !important;
+    font-weight: 500; /* Optional: Make the text slightly bolder for better readability */
+}
+
+/* Ensure nested elements inside the button also have white text */
+.stButton>button * {
+    color: #FFFFFF !important;
+}
+
+.stButton>button:hover {
+    background-color: #A9C7F1 !important; /* Lighter blue on hover */
+    color: #2C2C2C !important;
+}
+
+/* Ensure nested elements also change color on hover */
+.stButton>button:hover * {
+    color: #2C2C2C !important;
+}
+
+.stButton>button:active, .stButton>button:focus {
+    background-color: #FFFFFF !important; /* White background when clicked */
+    color: #0800E9 !important; /* Blue text for contrast when clicked */
+    border: 1px solid #1468D7 !important; /* Blue border to indicate selection */
+}
+
+/* Ensure nested elements also change color when active/focused */
+.stButton>button:active *, .stButton>button:focus * {
+    color: #0800E9 !important;
+}
+
+.stTextInput>div>input, .stSlider>div>div {
+    border: 1px solid #949494 !important;
+    border-radius: 5px;
+}
+
+.container-card {
+    background-color: #F8F8FA !important;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Style for radio buttons */
+.stRadio > label > div > div {
+    background-color: #FFFFFF !important; /* Default background for radio button */
+    border: 1px solid #949494 !important;
+}
+
+.stRadio > label > div > div[aria-checked="true"] {
+    background-color: #1468D7 !important; /* Blue background when selected */
+    border: 1px solid #1468D7 !important;
+}
+
+.stRadio > label > div > div[aria-checked="true"] > div {
+    background-color: #FFFFFF !important; /* White dot inside the selected radio button */
+}
