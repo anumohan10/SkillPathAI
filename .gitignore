@@ -3,3 +3,6 @@ venv/
 frontend/learning_path_debug.log
 CLAUDE.md
 frontend/career_transition_debug.log
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
