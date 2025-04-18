@@ -3,12 +3,20 @@
     schema='PROCESSED_DATA'
 ) }}
 
-WITH numbered AS (
-  SELECT
-    *,
-    ROW_NUMBER() OVER (ORDER BY ID) AS row_num
+WITH ranked_duplicates AS (
+  SELECT *,
+         ROW_NUMBER() OVER (
+           PARTITION BY COMPANY_REPORTED, BODY_TEXT, SOC_LABEL, TITLE_REPORTED
+           ORDER BY ID
+         ) AS dup_rn
   FROM {{ source('RAW_DATA', 'STG_JOB_POSTINGS') }}
   WHERE COMPANY_REPORTED IS NOT NULL
+),
+numbered AS (
+  SELECT *,
+         ROW_NUMBER() OVER (ORDER BY ID) AS row_num
+  FROM ranked_duplicates
+  WHERE dup_rn = 1
 )
 
 SELECT
