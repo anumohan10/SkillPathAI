@@ -85,7 +85,7 @@ class ChatService:
         
         # Available models to try
         models = [
-            'llama3.1-70b',
+            'mistral-large2',
             'llama3.1-8b',
             'snowflake-llama-3.1-405b'
         ]
