@@ -11,7 +11,7 @@ from backend.services.cortex_service import ResumeSearchService
 
 from backend.services.chat_service import ChatService
 from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
-from frontend.pages.learning_path import learning_path_chat
+from frontend.learning_path import learning_path_chat
 
 
 from frontend.components.career_chat import CareerChat
