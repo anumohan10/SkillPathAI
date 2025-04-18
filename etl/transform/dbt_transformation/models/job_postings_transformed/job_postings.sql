@@ -3,11 +3,27 @@
     schema='PROCESSED_DATA'
 ) }}
 
+WITH numbered AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (ORDER BY ID) AS row_num
+  FROM {{ source('RAW_DATA', 'STG_JOB_POSTINGS') }}
+  WHERE COMPANY_REPORTED IS NOT NULL
+)
+
 SELECT
   ID,
   COMPANY_REPORTED,
   SOC_LABEL,
-  BODY_TEXT,
+
+  -- Cleaned BODY_TEXT renamed as BODY_TEXT
+  REGEXP_REPLACE(
+    TRIM(
+      REGEXP_REPLACE(BODY_TEXT, '[\r\n]+', ' ')
+    ),
+    '[ ]{2,}', ' '
+  ) AS BODY_TEXT,
+
   TITLE_REPORTED,
 
   -- Combine hard and soft skill arrays into one string
@@ -16,9 +32,8 @@ SELECT
       COALESCE(HARD_SKILL_LABELS, ARRAY_CONSTRUCT()),
       COALESCE(SOFT_SKILL_LABELS, ARRAY_CONSTRUCT())
     ), ', '
-  ) AS SKILLS
+  ) AS SKILLS,
 
-FROM {{ source('RAW_DATA', 'STG_JOB_POSTINGS') }}
+  row_num
 
--- Only include rows with non-null COMPANY_REPORTED
-WHERE COMPANY_REPORTED IS NOT NULL
+FROM numbered
