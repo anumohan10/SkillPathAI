@@ -13,9 +13,6 @@ from backend.services.chat_service import ChatService
 from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
 from frontend.pages.learning_path import learning_path_chat
 
-
-from frontend.components.career_chat import CareerChat
-
 # --- Authentication Function ---
 USER_CREDENTIALS = {
     "alice": "password123",
@@ -131,7 +128,6 @@ def learning_path():
     learning_path_chat()
 
 
-# --- Career Transition Chat System ---
 # --- Career Transition Chat System ---
 def career_transition():
     st.header("Career Transition Assistant")

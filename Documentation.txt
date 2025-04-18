@@ -1,0 +1,357 @@
+# SkillPathAI Technical Documentation
+
+## Table of Contents
+1. [System Overview](#system-overview)
+2. [Code-Level Execution Flow](#code-level-execution-flow)
+   - [Application Startup and Authentication](#application-startup-and-authentication)
+   - [Career Transition Workflow](#career-transition-workflow)
+   - [Learning Path Generation](#learning-path-generation)
+3. [Backend Services Architecture](#backend-services-architecture)
+4. [Data Flow Between Components](#data-flow-between-components)
+5. [Frontend Architecture](#frontend-architecture)
+6. [Database Schema](#database-schema)
+7. [Integration with External Services](#integration-with-external-services)
+
+## System Overview
+
+SkillPathAI is a career transition and learning path platform designed to help users transition to new career roles by analyzing their existing skills, identifying skill gaps, and recommending personalized learning paths.
+
+The system consists of:
+- A Streamlit-based frontend providing an interactive user interface
+- A Python backend with various services for skills analysis, course recommendations, and career transition guidance
+- Integration with Snowflake database for data storage and retrieval
+- Vector-based search capabilities using Snowflake Cortex for resume and skills matching
+- LLM integration for natural language processing of resumes and skill extraction
+
+## Code-Level Execution Flow
+
+### Application Startup and Authentication
+
+#### Entry Point: Frontend Application Launch
+**File: `/frontend/main.py`**
+
+1. The application starts when a user runs `streamlit run main.py` from the frontend directory.
+2. Execution begins at line 38 with `if __name__ == '__main__'` which calls `main()` (line 11).
+3. The `main()` function first initializes the session state by checking if `"authenticated"` exists (line 12).
+4. If the user is not authenticated (`st.session_state["authenticated"] == False`), the function displays the login/signup interface (lines 17-36).
+5. Streamlit session state is initialized with `"auth_page" = "Login"` (line 20).
+6. The sidebar navigation displays login/signup options (lines 23-27).
+7. Based on user selection, either `login_page()` or `signup_page()` is called (lines 33-36).
+
+#### Authentication Flow
+**File: `/frontend/auth.py`**
+
+##### Login Process:
+1. When `login_page()` is called (line 37), a form is created for username/password input (lines 44-47).
+2. When the user submits the form (`submit = True`), the application:
+   - Loads user data from the JSON file using `load_users()` (line 50)
+   - Validates credentials by checking if the username exists and password is correct using `check_password()` (line 51)
+   - If valid, sets the session state: `st.session_state["authenticated"] = True` and `st.session_state["username"] = username` (lines 52-53)
+   - Then reloads the application with `st.rerun()` (line 55)
+
+##### Signup Process:
+1. When `signup_page()` is called (line 67), a form for user registration is created (lines 74-79).
+2. When the user submits the form (`signup_submit = True`), the application:
+   - Validates input fields for completeness and password matching (lines 82-85)
+   - Loads existing user data with `load_users()` (line 87)
+   - Checks if username or email already exists (lines 88-91)
+   - If validation passes, hashes the password with `hash_password()` (line 93)
+   - Stores user data in the JSON file with `save_users()` (line 98)
+   - Switches auth_page to "Login" and reloads with `st.rerun()` (lines 100-101)
+
+#### Dashboard Initialization After Authentication
+**File: `/frontend/dashboard.py`**
+
+1. After successful authentication, execution returns to `main.py:main()` which calls `main_app()` (line 16).
+2. In `dashboard.py`, `main_app()` creates the navigation sidebar (lines 126-130).
+3. Based on user selection, one of the core functions is called: `dashboard()`, `profile()`, `courses()`, `learning_path()`, or `career_transition()` (lines 132-141).
+4. The logout button is created in the sidebar which resets `st.session_state["authenticated"] = False` and reloads (lines 143-145).
+
+### Career Transition Workflow
+
+**File: `/frontend/pages/career_transition.py`**
+
+#### Initiation and State Management
+1. When `career_transition()` is called from `dashboard.py:main_app()` (line 141), it executes `career_transition_page()` (line 33).
+2. The function first sets up session state if not already initialized:
+   - `ct_state` for tracking conversation flow (line 189)
+   - `ct_messages` for storing chat history (line 192)
+   - `ct_data` for storing user data (line 195)
+3. Helper function `add_message()` is defined for updating the chat history (lines 199-200).
+4. Previous messages are rendered in the UI with `st.chat_message()` (lines 203-205).
+
+#### Step 1: Name Collection
+1. Initial state is `"ask_name"` (line 208).
+2. If no messages exist, a welcome message is added (lines 209-211).
+3. A chat input is created to collect the user's name (line 213).
+4. When user provides their name, the application:
+   - Stores it in `st.session_state.ct_data["name"]` (line 215)
+   - Adds the user input and assistant response to message history (lines 216-217)
+   - Updates state to `"ask_resume"` (line 218)
+   - Reloads the app with `st.rerun()` (line 219)
+
+#### Step 2: Resume Upload and Analysis
+1. State transitions to `"ask_resume"` (line 222).
+2. A file uploader is created for resume upload (lines 224-225).
+3. When a file is uploaded, the application:
+   - Extracts text from the resume using `extract_text()` from `backend/services/resume_parser.py` (line 229)
+   - Stores the resume text in session state (line 235)
+   - Initializes the `ChatService` class if not already created (lines 239-240)
+   - Extracts skills from the resume using either `chat_service.extract_skills()` or `extract_skills_from_text()` fallback (lines 242-245)
+   - Stores extracted skills in session state (line 248)
+   - Formats and displays the extracted skills (lines 254-255)
+   - Updates state to `"ask_target_role"` (line 258)
+   - Reloads the app with `st.rerun()` (line 259)
+
+#### Step 3: Target Role Collection
+1. State transitions to `"ask_target_role"` (line 267).
+2. Chat input is created for collecting the target role (line 268).
+3. When user provides the target role, the application:
+   - Stores it in session state (line 270)
+   - Adds it to message history (line 271)
+   - Informs the user that skill gap analysis is starting (lines 273-274)
+   - Stores resume data using `ResumeSearchService.store_resume()` (lines 279-286)
+   - Updates state to `"analyze_skills"` (line 293)
+   - Reloads the app with `st.rerun()` (line 294)
+
+#### Step 4: Skill Analysis and Recommendation Generation
+1. State transitions to `"analyze_skills"` (line 297).
+2. The application:
+   - Shows progress indicators for various analysis steps (lines 306-307)
+   - Gets missing skills using `process_missing_skills()` from `career_transition_service.py` (line 311)
+   - Stores the analysis in the database using `store_career_analysis()` (lines 320-326)
+   - Gets course recommendations using `get_career_transition_courses()` (lines 334-338)
+   - Converts course results to a DataFrame for compatibility (lines 341-351)
+   - Updates state to `"display_results"` (line 362)
+   - Reloads the app with `st.rerun()` (line 363)
+
+#### Step 5: Results Display
+1. State transitions to `"display_results"` (line 373).
+2. If not already displayed, the application:
+   - Formats the transition plan using `format_transition_plan()` (lines 388-394)
+   - Adds the skill assessment to the chat (line 397)
+   - Adds course recommendations if available (lines 400-405)
+   - Adds career advice (line 408)
+   - Marks results as displayed (line 411)
+   - Reloads the app with `st.rerun()` (line 412)
+3. When results are displayed, a chat input is created for follow-up questions (line 415).
+4. When user asks a follow-up, the application:
+   - Adds the question to chat history (line 417)
+   - Creates a context prompt with user data (lines 422-426)
+   - Gets a response using `chat_service.get_llm_response()` (lines 430-435)
+   - Adds the response to chat history (line 437)
+   - Reloads the app with `st.rerun()` (line 443)
+
+### Learning Path Generation
+
+**File: `/frontend/pages/learning_path.py`**
+
+#### Initiation and State Management
+1. When `learning_path()` is called from `dashboard.py:main_app()` (line 139), it executes `learning_path_chat()` (line 28).
+2. The function first sets up session state if not already initialized:
+   - `lp_state` for tracking conversation flow (line 186)
+   - `lp_messages` for storing chat history (line 187)
+   - `lp_data` for storing user data (line 188)
+3. Helper function `add_message()` is defined for updating the chat history (lines 191-192).
+4. Previous messages are rendered in the UI with `st.chat_message()` (lines 195-197).
+
+#### Step 1: Name Collection
+1. Initial state is `"ask_name"` (line 200).
+2. If no messages exist, a welcome message is added (lines 201-203).
+3. A chat input is created to collect the user's name (line 205).
+4. When user provides their name, the application:
+   - Stores it in `st.session_state.lp_data["name"]` (line 207)
+   - Adds the user input and assistant response to message history (lines 208-209)
+   - Updates state to `"ask_role"` (line 210)
+   - Reloads the app with `st.rerun()` (line 211)
+
+#### Step 2: Target Role Collection
+1. State transitions to `"ask_role"` (line 214).
+2. Chat input is created for collecting the target role (line 215).
+3. When user provides the target role, the application:
+   - Stores it in session state (line 217)
+   - Adds it to message history (line 218)
+   - Gets top skills for the role using `get_top_skills_for_role()` from `skill_service.py` (line 223)
+   - Stores the top skills in session state and initializes skill ratings (lines 224-226)
+   - Displays the skills and asks the user to rate them (line 229)
+   - Updates state to `"rate_skills"` (line 230)
+   - Reloads the app with `st.rerun()` (line 235)
+
+#### Step 3: Skill Rating Collection
+1. State transitions to `"rate_skills"` (line 258).
+2. The application:
+   - Gets the current skill to rate (lines 259-262)
+   - Asks the user to rate their proficiency in that skill (line 264)
+   - Updates state to `"wait_for_rating"` (line 265)
+   - Reloads the app with `st.rerun()` (line 266)
+3. In the `"wait_for_rating"` state (line 279):
+   - Chat input is created for the rating (line 284)
+   - When user provides a rating, it's validated and stored in `skill_ratings` (lines 286-290)
+   - The state returns to `"rate_skills"` to get the next skill rating (line 293)
+   - Reloads the app with `st.rerun()` (line 295)
+4. Once all skills are rated, state transitions to `"generate_courses"` (lines 272-276).
+
+#### Step 4: Course Recommendation Generation
+1. State transitions to `"generate_courses"` (line 304).
+2. The application:
+   - Stores the learning path using `store_learning_path()` from `learning_path_service.py` (line 311)
+   - Gets course recommendations using `get_course_recommendations()` from `course_service.py` (line 324)
+   - Stores course data in session state (line 327)
+   - Adds completion message to chat history (line 336)
+   - Updates state to `"display_results"` (line 337)
+   - Reloads the app with `st.rerun()` (line 338)
+
+#### Step 5: Results Display
+1. State transitions to `"display_results"` (line 341).
+2. If not already displayed, the application:
+   - Formats the skill assessment using `format_skills_for_display()` (line 350)
+   - Formats course recommendations using `format_course_message()` (line 354)
+   - Adds personalized introduction using `format_introduction()` (line 358)
+   - Adds career advice using `format_career_advice()` (line 366)
+   - Marks results as displayed (line 370)
+   - Reloads the app with `st.rerun()` (line 371)
+3. When results are displayed, a chat input is created for follow-up questions (line 374).
+4. When user asks a follow-up, the application:
+   - Adds the question to chat history (line 376)
+   - Creates a context dictionary with user data (lines 381-386)
+   - Gets a response using `chat_service.answer_career_question()` (lines 389-390)
+   - Adds the response to chat history (line 391)
+   - Reloads the app with `st.rerun()` (line 396)
+
+## Backend Services Architecture
+
+### Chat Service
+**File: `/backend/services/chat_service.py`**
+
+1. `ChatService` class initializes by establishing a Snowflake connection (lines 15-19).
+2. Key methods include:
+   - `get_llm_response(prompt, context)`: Sends prompts to LLM models via Snowflake Cortex (lines 67-115)
+   - `extract_skills(resume_text)`: Extracts skills from resume text (lines 117-178)
+   - `identify_missing_skills(current_skills, target_role)`: Analyzes missing skills (lines 180-243)
+   - `generate_career_advice(current_skills, target_role)`: Creates career transition advice (lines 245-291)
+   - `answer_career_question(question, user_context)`: Handles follow-up questions (lines 293-321)
+
+### Career Transition Service
+**File: `/backend/services/career_transition_service.py`**
+
+1. Provides specialized functions for career transition workflows:
+   - `process_missing_skills(extracted_skills, target_role)`: Identifies skills gaps (lines 61-135)
+   - `store_career_analysis(username, resume_text, extracted_skills, target_role)`: Saves analysis to database (lines 169-226)
+   - `get_career_transition_courses(target_role, missing_skills)`: Gets personalized course recommendations (lines 228-403)
+   - `format_transition_plan(username, current_skills, target_role, missing_skills, courses)`: Creates formatted transition plan (lines 512-799)
+
+### Learning Path Service
+**File: `/backend/services/learning_path_service.py`**
+
+1. Provides functions for the learning path workflow:
+   - `get_learning_path(username)`: Gets personalized learning path (lines 13-24)
+   - `get_user_learning_path(user_id)`: Retrieves stored learning path (lines 26-68)
+   - `store_learning_path(data)`: Saves learning path data to database (lines 70-134)
+
+### Resume Parsing Service
+**File: `/backend/services/resume_parser.py`**
+
+1. Provides `extract_text(file)` function to extract content from PDF or DOCX files (lines 5-12).
+
+### Skill Matcher Service
+**File: `/backend/services/skill_matcher.py`**
+
+1. Provides functions for skill analysis:
+   - `extract_skills_from_text(text)`: Extracts skills using regex patterns (lines 4-50)
+   - `get_job_requirements(role)`: Gets required skills for a role (lines 52-172)
+   - `match_skills(extracted_skills, target_role)`: Compares user skills to job requirements (lines 179-228)
+   - `generate_skill_recommendations(missing_essential, missing_preferred, target_role)`: Creates learning recommendations (lines 230-255)
+
+### Course Service
+**File: `/backend/services/course_service.py`**
+
+1. Provides `get_course_recommendations(target_role, user_id, resume_id)` function which:
+   - Connects to Snowflake database (lines 28-34)
+   - Gets missing skills from resume or low-rated skills from learning path (lines 48-146)
+   - Queries for personalized course recommendations using Snowflake Cortex (lines 149-183)
+   - Formats and returns results as a DataFrame (lines 190-219)
+
+### UI Service
+**File: `/backend/services/ui_service.py`**
+
+1. Provides formatting functions for UI display:
+   - `format_course_message(courses_df, target_role)`: Formats course recommendations (lines 8-124)
+   - `format_introduction(target_role, skill_ratings)`: Formats learning path introduction (lines 126-156)
+   - `format_career_advice()`: Creates career advice section (lines 158-176)
+
+### Cortex Service
+**File: `/backend/services/cortex_service.py`**
+
+1. `ResumeSearchService` class provides integration with Snowflake Cortex:
+   - Initializes by establishing a Snowflake connection and creating search service (lines 12-41)
+   - `store_resume(user_name, resume_text, extracted_skills, target_role)`: Stores resume data (lines 197-233)
+   - `_calculate_missing_skills(extracted_skills, target_role)`: Analyzes skill gaps (lines 113-142)
+   - `search_resumes(resume_text, target_role)`: Searches for similar resumes (lines 236-263)
+   - `generate_career_path(search_results, target_role)`: Generates career transition plan (lines 265-330)
+
+## Data Flow Between Components
+
+### Authentication Flow
+1. User credentials → `login_page()` → `load_users()` → credential validation → session state update
+
+### Career Transition Flow
+1. User name → `career_transition_page()` → session state storage
+2. Resume upload → `extract_text()` → `extract_skills()` → skill extraction → session state storage
+3. Target role → `process_missing_skills()` → `store_career_analysis()` → `get_career_transition_courses()` → course recommendations → session state storage
+4. Results display → `format_transition_plan()` → formatted UI output
+5. Follow-up questions → `chat_service.get_llm_response()` → response output
+
+### Learning Path Flow
+1. User name → `learning_path_chat()` → session state storage
+2. Target role → `get_top_skills_for_role()` → skill list → session state storage
+3. Skill ratings → rating collection → session state storage
+4. Course generation → `store_learning_path()` → `get_course_recommendations()` → course data → session state storage
+5. Results display → `format_skills_for_display()` → `format_course_message()` → `format_introduction()` → `format_career_advice()` → formatted UI output
+6. Follow-up questions → `chat_service.answer_career_question()` → response output
+
+## Frontend Architecture
+
+The frontend is built with Streamlit and organized into multiple pages and components:
+
+### Main Components
+
+- **main.py**: Entry point for the Streamlit application, handles authentication and main app initialization
+- **app.py**: Contains the application layout, navigation, and page routing
+- **dashboard.py**: Implements the dashboard interface with navigation to other sections
+- **auth.py**: Manages user authentication and session state
+
+### Pages
+
+- **career_transition.py**: Implements the career transition assistant, allowing users to upload their resume, specify a target role, and receive personalized transition plans
+- **learning_path.py**: Provides learning path recommendations based on user skills and target role
+
+### State Management
+
+The frontend uses Streamlit's session_state for storing user data and maintaining state between page reloads. Key state variables include:
+- Authentication state
+- User profile data
+- Chat history 
+- Analysis results
+- Course recommendations
+
+## Database Schema
+
+The system uses a Snowflake database with several main tables:
+
+- **users**: Stores user information and authentication data
+- **skills**: Contains skill definitions, categories, and related information
+- **courses**: Stores course information including name, platform, URL, description, and level
+- **resumes**: Stores resume text, extracted skills, target roles, and analysis results
+- **learning_paths**: Stores user learning paths, including target role, skills, and course recommendations
+
+## Integration with External Services
+
+### Snowflake Integration
+- The system connects to Snowflake using the `get_snowflake_connection()` function in database.py
+- SQL queries are executed for data retrieval and storage
+- Snowflake Cortex search capabilities are used for semantic searching of resumes and courses
+
+### LLM Integration
+- The ChatService class provides a wrapper for integrating with language models
+- The service is used for extracting skills, generating career advice, and answering user questions
+- Fallback mechanisms are implemented for when LLM services are unavailable

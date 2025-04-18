@@ -2,7 +2,6 @@
 
 import json
 import logging
-from datetime import datetime
 from contextlib import contextmanager
 from backend.database import get_snowflake_connection
 

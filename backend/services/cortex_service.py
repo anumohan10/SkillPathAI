@@ -3,7 +3,6 @@ import json
 import uuid
 import logging
 import re
-from datetime import datetime
 from contextlib import contextmanager
 from backend.database import get_snowflake_connection, create_resumes_table
 

@@ -9,10 +9,7 @@ from backend.services.resume_parser import extract_text
 from backend.services.cortex_service import ResumeSearchService
 from backend.services.chat_service import ChatService
 from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
-from frontend.components.career_chat import CareerChat
 from backend.services.learning_path_service import get_learning_path
-#from frontend.pages.learning_path import display_learning_path
-
 
 
 
@@ -113,7 +110,6 @@ def courses():
             st.write(f"Results for '{search_query}' will be displayed here.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- Learning Path ---
 # --- Learning Path ---
 def learning_path():
     from frontend.pages.learning_path import learning_path_chat

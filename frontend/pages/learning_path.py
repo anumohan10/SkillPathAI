@@ -4,7 +4,6 @@ import sys
 import json
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
 # Import backend services
 from backend.services.learning_path_service import store_learning_path

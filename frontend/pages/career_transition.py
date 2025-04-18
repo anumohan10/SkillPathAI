@@ -4,7 +4,6 @@ import sys
 import json
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
 # Import backend services
 from backend.services.resume_parser import extract_text
@@ -17,6 +16,7 @@ from backend.services.career_transition_service import (
     format_transition_plan
 )
 from backend.services.skill_matcher import extract_skills_from_text
+from backend.services.cortex_service import ResumeSearchService
 
 # Set up logging
 logging.basicConfig(
@@ -347,12 +347,6 @@ def career_transition_page():
                     beginner_count = len(courses_df[courses_df['LEVEL_CATEGORY'] == 'BEGINNER'])
                     intermediate_count = len(courses_df[courses_df['LEVEL_CATEGORY'] == 'INTERMEDIATE'])
                     advanced_count = len(courses_df[courses_df['LEVEL_CATEGORY'] == 'ADVANCED'])
-                    
-                    # Calculate percentages for visualization
-                    total = beginner_count + intermediate_count + advanced_count
-                    beg_pct = int((beginner_count/total)*100) if total > 0 else 0
-                    int_pct = int((intermediate_count/total)*100) if total > 0 else 0
-                    adv_pct = int((advanced_count/total)*100) if total > 0 else 0
                     
                 else:
                     debug_container.warning("No courses found")
