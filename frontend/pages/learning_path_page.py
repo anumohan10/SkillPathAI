@@ -59,7 +59,7 @@ def render_learning_path_page(): # Renamed function
     with st.expander("Diagnostic Information (Click to expand)"):
         debug_container = st.container()
         # Optionally display session state for debugging
-        # debug_container.json(st.session_state.to_dict()) # Display full state as JSON
+        debug_container.json(st.session_state.to_dict()) # Display full state as JSON
 
     # Initialize session state for the learning path conversation
     if "lp_state" not in st.session_state:
