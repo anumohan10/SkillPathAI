@@ -36,7 +36,8 @@ def main_app():
 
     with st.sidebar:
         st.title("SkillPathAI") # Consistent Title
-        st.write(f"Welcome, {st.session_state.get('username', 'Guest')}!")
+        display_name = st.session_state.get("name") or st.session_state.get("username", "Guest")
+        st.write(f"👋 Welcome, {display_name}!")
         st.markdown("---")
 
         # Define navigation options
