@@ -74,23 +74,3 @@ def get_top_skills_for_role(role):
                 conn.close()
             except:
                 pass
-
-def format_skills_for_display(skill_ratings):
-    """
-    Format skill ratings for display in the UI.
-    
-    Args:
-        skill_ratings (dict): A dictionary of skill ratings
-        
-    Returns:
-        str: HTML/Markdown formatted skill assessment
-    """
-    if not skill_ratings:
-        return "No skills have been rated yet."
-        
-    skill_assessment = "### Your Current Skills Assessment\n\n"
-    for skill, rating in skill_ratings.items():
-        stars = "★" * rating + "☆" * (5 - rating)
-        skill_assessment += f"- **{skill}**: {stars} ({rating}/5)\n"
-        
-    return skill_assessment
