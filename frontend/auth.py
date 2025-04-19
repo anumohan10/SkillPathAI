@@ -44,7 +44,7 @@ def signup_page():
     st.title("SkillPath - Career Transition Platform")
     st.header("Sign Up")
 
-    create_users_table()  # Ensure the users table exists
+    # create_users_table()  # Ensure the users table exists
 
     with st.container():
         st.markdown('<div class="container-card">', unsafe_allow_html=True)
