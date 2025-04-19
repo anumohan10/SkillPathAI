@@ -352,10 +352,10 @@ def render_career_transition_page(): # Renamed function
                 try:
                     # Create context for the chat service
                     user_context = {
-                        'name': st.session_state.lp_data.get('name', 'User'),
-                        'target_role': st.session_state.lp_data.get('target_role', 'Unknown'),
-                        'skills': list(st.session_state.lp_data.get('skill_ratings', {}).keys()),
-                        'skill_ratings': st.session_state.lp_data.get('skill_ratings', {})
+                        'name': st.session_state.ct_data.get('name', 'User'),
+                        'target_role': st.session_state.ct_data.get('target_role', 'Unknown'),
+                        'skills': list(st.session_state.ct_data.get('missing_skills', {})),
+                        'chat_history': st.session_state.ct_messages
                         # Optionally add course info if relevant to context
                         # 'courses': st.session_state.lp_data.get("courses", pd.DataFrame()).to_dict('records')
                     }
@@ -380,8 +380,14 @@ def render_career_transition_page(): # Renamed function
         st.session_state.ct_state = "ask_name"
         st.session_state.ct_messages = []
         st.session_state.ct_data = {}
+        st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         if "results_displayed" in st.session_state:
             del st.session_state.results_displayed
+        save_chat_history(
+            user_name=st.session_state.ct_data.get("name", "User"),
+            chat_history=st.session_state.ct_messages,
+            cur_timestamp=st.session_state.cur_timestamp
+        )
         st.rerun()
 
     if st.sidebar.button("⏹️ End Chat"):
