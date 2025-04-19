@@ -11,6 +11,7 @@ st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 def main():
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
+        
 
     if st.session_state["authenticated"]:
         main_app()
