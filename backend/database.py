@@ -1,11 +1,14 @@
 import os
 import snowflake.connector
 from dotenv import load_dotenv
-
+import logging
+import json
 # Load environment variables
 load_dotenv()
 
 # TODO: Move all create table queries to dbt for better schema management and version control
+
+logger = logging.getLogger(__name__)
 
 def get_snowflake_connection():
     """Establish a connection to Snowflake using .env credentials."""
@@ -21,7 +24,7 @@ def get_snowflake_connection():
         )
         return conn
     except Exception as e:
-        print("❌ Error connecting to Snowflake:", e)
+        logger.error(f"❌ Error connecting to Snowflake: {e}")
         return None
 
 def create_resumes_table():
@@ -43,9 +46,9 @@ def create_resumes_table():
             """
             cur.execute(create_table_query)
             conn.commit()
-            print("✅ Snowflake table 'resumes' is ready.")
+            logger.info("✅ Snowflake table 'resumes' is ready.")
         except Exception as e:
-            print("❌ Error creating resumes table:", e)
+            logger.error(f"❌ Error creating resumes table: {e}")
         finally:
             cur.close()
             conn.close()
@@ -59,7 +62,7 @@ def save_chat_history(user_name, chat_history, cur_timestamp):
             create_table_query = """
             CREATE TABLE IF NOT EXISTS chat_history (
                 user_name VARCHAR(255),
-                chat_history VARIANT,  -- Using VARIANT type for JSON storage
+                chat_history VARCHAR,
                 cur_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
             );
             """
@@ -68,11 +71,11 @@ def save_chat_history(user_name, chat_history, cur_timestamp):
             INSERT INTO chat_history (user_name, chat_history, cur_timestamp)
             VALUES (%s, %s, %s);
             """
-            cur.execute(insert_query, (user_name, chat_history, cur_timestamp))
+            cur.execute(insert_query, (user_name, json.dumps(chat_history), cur_timestamp))
             conn.commit()
-            print("✅ Chat history saved to Snowflake.")
+            logger.info("✅ Chat history saved to Snowflake.")
         except Exception as e:
-            print("❌ Error saving chat history:", e)
+            logger.error(f"❌ Error saving chat history: {e}")
         finally:
             cur.close()
             conn.close()
