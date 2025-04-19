@@ -15,6 +15,7 @@ from backend.services.skill_service import get_top_skills_for_role, format_skill
 from backend.services.course_service import get_course_recommendations
 from backend.services.ui_service import format_course_message, format_introduction, format_career_advice
 from backend.services.chat_service import ChatService
+from backend.database import save_chat_history
 
 # Set up logging (consider moving configuration to a central place)
 logging.basicConfig(
@@ -26,6 +27,7 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__) # Use __name__ for logger
+now = datetime.now()
 
 
 def render_learning_path_page(): # Renamed function
@@ -42,12 +44,22 @@ def render_learning_path_page(): # Renamed function
     # Add Back button
     if st.button("⬅️ Back to Guidance Hub"):
         st.session_state.current_page = "Guidance Hub"
+        # Save chat history before clearing
+        if 'lp_messages' in st.session_state and len(st.session_state.lp_messages) > 0 and st.session_state.get('results_displayed', False):
+            save_chat_history(
+                user_name=st.session_state.lp_data.get("name", "User"),
+                chat_history=json.dumps(st.session_state.lp_messages),
+                cur_timestamp=st.session_state.cur_timestamp
+            )
+            logger.info("Saved chat history on navigation back (results were displayed)")
+        else:
+            logger.info("No chat history to save on navigation back (results were not displayed)")
         # Clear specific states for this page if needed when going back
-        # Consider resetting lp_state, lp_messages, lp_data here
         if 'lp_state' in st.session_state: del st.session_state.lp_state
         if 'lp_messages' in st.session_state: del st.session_state.lp_messages
         if 'lp_data' in st.session_state: del st.session_state.lp_data
         if 'results_displayed' in st.session_state: del st.session_state.results_displayed
+        if 'cur_timestamp' in st.session_state: del st.session_state.cur_timestamp
         logger.info("Navigating back to Guidance Hub, resetting LP state.")
         st.rerun()
 
@@ -66,6 +78,7 @@ def render_learning_path_page(): # Renamed function
         st.session_state.lp_state = "ask_name"
         st.session_state.lp_messages = []
         st.session_state.lp_data = {}
+        st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         logger.info("Initialized learning path session state.")
         # Don't rerun here, let the ask_name block handle the first message
 
@@ -316,9 +329,30 @@ def render_learning_path_page(): # Renamed function
             st.rerun() # Rerun once to ensure all messages are shown
 
         # Handle follow-up questions
-        user_input = st.chat_input("Ask a question about your learning path", key="lp_followup_input") # Added key
+        user_input = st.chat_input("Ask a question about your learning path or type 'restart' to begin again", key="lp_followup_input")
         if user_input:
             add_message("user", user_input)
+            
+            # Check if user wants to restart
+            if user_input.lower() in ['restart', 'start over', 'reset']:
+                add_message("assistant", "Let's start fresh with a new learning path analysis!")
+                # Save chat history before resetting
+                if st.session_state.get('results_displayed', False):
+                    save_chat_history(
+                        user_name=st.session_state.lp_data.get("name", "User"),
+                        chat_history=json.dumps(st.session_state.lp_messages),
+                        cur_timestamp=st.session_state.cur_timestamp
+                    )
+                    logger.info("Saved chat history on restart via chat (results were displayed)")
+                # Reset session state
+                st.session_state.lp_state = "ask_name"
+                st.session_state.lp_messages = []
+                st.session_state.lp_data = {}
+                st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+                if "results_displayed" in st.session_state:
+                    del st.session_state.results_displayed
+                st.rerun()
+            
             logger.info(f"User asked follow-up question: {user_input}")
             with st.spinner("Thinking..."):
                 try:
@@ -327,7 +361,7 @@ def render_learning_path_page(): # Renamed function
                         'name': st.session_state.lp_data.get('name', 'User'),
                         'target_role': st.session_state.lp_data.get('target_role', 'Unknown'),
                         'skills': list(st.session_state.lp_data.get('skill_ratings', {}).keys()),
-                        'skill_ratings': st.session_state.lp_data.get('skill_ratings', {})
+                        'chat_history': st.session_state.lp_messages
                         # Optionally add course info if relevant to context
                         # 'courses': st.session_state.lp_data.get("courses", pd.DataFrame()).to_dict('records')
                     }
@@ -351,17 +385,49 @@ def render_learning_path_page(): # Renamed function
         st.session_state.lp_state = "ask_name"
         st.session_state.lp_messages = []
         st.session_state.lp_data = {}
+        st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         if "results_displayed" in st.session_state:
             del st.session_state.results_displayed
         st.rerun()
 
-    # Add restart button (Consider making this conditional based on state)
-    if st.button("Restart Learning Path Analysis"):
-        logger.info("User initiated learning path reset from page button.")
+    # --- Sidebar Actions ---
+    st.sidebar.divider()
+    st.sidebar.header("Chat Controls")
+    if st.sidebar.button("🔄 Restart Analysis"):
+        logger.info("User initiated learning path reset from sidebar button.")
+        # Save chat history before resetting
+        if len(st.session_state.get("lp_messages", [])) > 0 and st.session_state.get('results_displayed', False):
+            save_chat_history(
+                user_name=st.session_state.lp_data.get("name", "User"),
+                chat_history=json.dumps(st.session_state.lp_messages),
+                cur_timestamp=st.session_state.cur_timestamp
+            )
+            logger.info("Saved chat history on sidebar restart (results were displayed)")
         # Reset chat state
         st.session_state.lp_state = "ask_name"
         st.session_state.lp_messages = []
         st.session_state.lp_data = {}
+        st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         if "results_displayed" in st.session_state:
             del st.session_state.results_displayed
+        st.rerun()
+        
+    if st.sidebar.button("⏹️ End Chat"):
+        logger.info("User clicked End Chat from sidebar button.")
+        st.session_state.current_page = "Dashboard"
+        # Save chat history
+        if st.session_state.get('results_displayed', False):
+            save_chat_history(
+                user_name=st.session_state.lp_data.get("name", "User"),
+                chat_history=json.dumps(st.session_state.lp_messages),
+                cur_timestamp=st.session_state.cur_timestamp
+            )
+            logger.info("Saved chat history on end chat (results were displayed)")
+        # Clear specific states for this page
+        if 'lp_state' in st.session_state: del st.session_state.lp_state
+        if 'lp_messages' in st.session_state: del st.session_state.lp_messages
+        if 'lp_data' in st.session_state: del st.session_state.lp_data
+        if 'results_displayed' in st.session_state: del st.session_state.results_displayed
+        if 'cur_timestamp' in st.session_state: del st.session_state.cur_timestamp
+        logger.info("Navigating to Dashboard, resetting LP state.")
         st.rerun() 
