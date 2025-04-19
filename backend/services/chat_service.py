@@ -343,33 +343,34 @@ class ChatService:
      # Instruction to restrict scope
     SYSTEM_INSTRUCTION = (
         "You are an assistant confined to the provided conversation history. "
-        "Only answer questions directly related to this learning-path context. "
+        "Only answer questions directly related to this career-transition-path or learning-path context. "
         "If a user asks anything outside this scope, respond with: "
         "I'm sorry, but I can only answer questions about your personalized learning path based on the conversation history."
     )
     # Hardcoded conversation history
-    CONVERSATION_HISTORY = [
-        {"role": "assistant", "content": "👋 Hello! I'll help you create a personalized learning path. What's your name?"},
-        {"role": "user", "content": "Ram"},
-        {"role": "assistant", "content": "Nice to meet you, Ram! What career would you like to pursue? (e.g., Data Engineer, Data Scientist, Software Engineer)"},
-        {"role": "user", "content": "Data Scientist"},
-        {"role": "assistant", "content": "Great! For a **Data Scientist** role, these are the top skills you'll need:\n\n- Python\n- SQL\n- Machine Learning\n- Cloud Computing\n- Data Visualization\n\nLet's assess your current skill level in each area."},
-        {"role": "assistant", "content": "How would you rate your proficiency in **Python** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
-        {"role": "user", "content": "3"},
-        {"role": "assistant", "content": "How would you rate your proficiency in **SQL** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
-        {"role": "user", "content": "3"},
-        {"role": "assistant", "content": "How would you rate your proficiency in **Machine Learning** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
-        {"role": "user", "content": "1"},
-        {"role": "assistant", "content": "How would you rate your proficiency in **Cloud Computing** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
-        {"role": "user", "content": "2"},
-        {"role": "assistant", "content": "How would you rate your proficiency in **Data Visualization** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
-        {"role": "user", "content": "4"},
-        {"role": "assistant", "content": "Thanks for the ratings! Now generating your personalized learning path..."},
-        {"role": "assistant", "content": "### Your Current Skills Assessment\n\n- **Python**: ★★★☆☆ (3/5)\n- **SQL**: ★★★☆☆ (3/5)\n- **Machine Learning**: ★☆☆☆☆ (1/5)\n- **Cloud Computing**: ★★☆☆☆ (2/5)\n- **Data Visualization**: ★★★★☆ (4/5)\n"},
-        {"role": "assistant", "content": "# 🚀 Your Personalized Data Engineering Learning Path\n\nBased on your current skill assessment, I've curated courses that will help you advance your career as a **Data Scientist**. These recommendations focus on strengthening your skills in:\n\n- **Python** ⭐⭐ (Focus area)\n- **SQL** ⭐⭐ (Focus area)\n- **Machine Learning** ⭐ (Prioritize)\n- **Cloud Computing** ⭐ (Prioritize)\n\nThe learning path is organized from beginner to advanced courses, designed for completion within 6 months. Each course is chosen to address specific skill gaps and help you build a comprehensive foundation in data engineering.\n"},
-        {"role": "assistant", "content": "# Data Engineer Learning Path\n\n1. **Intro to Data Science: Your Step-by-Step Guide To Starting** (Udemy - Beginner)\n   - *What you'll learn*: Entire Data Science process, Cloud concepts, Database fundamentals\n   - *Skills*: Data Science, Cloud Computing, Databases\n   - [Enroll](https://www.udemy.com/course/intro-to-data-science/)\n2. **Complete Python for data science and cloud computing** (Udemy - All Levels)\n   - *What you'll learn*: Predictive modeling, ML algorithms, result presentation\n   - *Skills*: Python, Machine Learning, Cloud Computing, Data Analysis\n   - [Enroll](https://www.udemy.com/course/complete-python-for-data-science-and-cloud-computing/)\n3. **Data Science Beginner's Course 2020** (Udemy - All Levels)\n   - *What you'll learn*: Basics to advanced methods, step-by-step instruction\n   - *Skills*: Data Analysis, Statistics, Programming, Visualization\n   - [Enroll](https://www.udemy.com/course/complete-data-science-course-go-from-zero-to-hero-a/)\n4. **Data Science 2022: Complete Data Science & Machine Learning** (Udemy - All Levels)\n   - *What you'll learn*: Advanced concepts in Python, Linear Algebra, ML math\n   - *Skills*: Python, ML theory, Calculus, Vectors, Matrices\n   - [Enroll](https://www.udemy.com/course/complete-data-science-and-machine-learning-using-python/)\n5. **The Data Science Course 2022: Complete Data Science Bootcamp** (Udemy - All Levels)\n   - *What you'll learn*: Stats analysis, Python libraries, ML & deep learning, Tableau\n   - *Skills*: NumPy, pandas, matplotlib, scikit-learn, TensorFlow\n   - [Enroll](https://www.udemy.com/course/the-data-science-course-complete-data-science-bootcamp/)\n6. **Most Effective Tips to Get Your Dream Data Science Job** (Udemy - All Levels)\n   - *What you'll learn*: Job market skillset, portfolio tips, career strategies\n   - *Skills*: Python, R, SQL, Visualization, Big Data, Data Mining\n   - [Enroll](https://www.udemy.com/course/most-effective-tips-to-get-your-dream-data-science-job/)\n"},
-        {"role": "assistant", "content": "# 💼 Next Steps After Completing Your Learning Path\n\nOnce you've completed these courses, consider:\n1. **Building a portfolio**: 2-3 projects with cloud data pipelines and big data tech.\n2. **Certifications**: Google Cloud Professional Data Engineer, AWS Data Analytics Specialty.\n3. **Community**: Engage on Stack Overflow, Reddit's r/dataengineering, Meetup groups.\n4. **Open source**: Contribute to data engineering repos for visibility.\n\nAny questions about your learning path or next steps?"}
-    ]
+    CONVERSATION_HISTORY = []
+    # CONVERSATION_HISTORY = [
+    #     {"role": "assistant", "content": "👋 Hello! I'll help you create a personalized learning path. What's your name?"},
+    #     {"role": "user", "content": "Ram"},
+    #     {"role": "assistant", "content": "Nice to meet you, Ram! What career would you like to pursue? (e.g., Data Engineer, Data Scientist, Software Engineer)"},
+    #     {"role": "user", "content": "Data Scientist"},
+    #     {"role": "assistant", "content": "Great! For a **Data Scientist** role, these are the top skills you'll need:\n\n- Python\n- SQL\n- Machine Learning\n- Cloud Computing\n- Data Visualization\n\nLet's assess your current skill level in each area."},
+    #     {"role": "assistant", "content": "How would you rate your proficiency in **Python** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
+    #     {"role": "user", "content": "3"},
+    #     {"role": "assistant", "content": "How would you rate your proficiency in **SQL** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
+    #     {"role": "user", "content": "3"},
+    #     {"role": "assistant", "content": "How would you rate your proficiency in **Machine Learning** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
+    #     {"role": "user", "content": "1"},
+    #     {"role": "assistant", "content": "How would you rate your proficiency in **Cloud Computing** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
+    #     {"role": "user", "content": "2"},
+    #     {"role": "assistant", "content": "How would you rate your proficiency in **Data Visualization** on a scale of 1-5?\n\n1: No experience\n2: Basic knowledge\n3: Intermediate\n4: Advanced\n5: Expert"},
+    #     {"role": "user", "content": "4"},
+    #     {"role": "assistant", "content": "Thanks for the ratings! Now generating your personalized learning path..."},
+    #     {"role": "assistant", "content": "### Your Current Skills Assessment\n\n- **Python**: ★★★☆☆ (3/5)\n- **SQL**: ★★★☆☆ (3/5)\n- **Machine Learning**: ★☆☆☆☆ (1/5)\n- **Cloud Computing**: ★★☆☆☆ (2/5)\n- **Data Visualization**: ★★★★☆ (4/5)\n"},
+    #     {"role": "assistant", "content": "# 🚀 Your Personalized Data Engineering Learning Path\n\nBased on your current skill assessment, I've curated courses that will help you advance your career as a **Data Scientist**. These recommendations focus on strengthening your skills in:\n\n- **Python** ⭐⭐ (Focus area)\n- **SQL** ⭐⭐ (Focus area)\n- **Machine Learning** ⭐ (Prioritize)\n- **Cloud Computing** ⭐ (Prioritize)\n\nThe learning path is organized from beginner to advanced courses, designed for completion within 6 months. Each course is chosen to address specific skill gaps and help you build a comprehensive foundation in data engineering.\n"},
+    #     {"role": "assistant", "content": "# Data Engineer Learning Path\n\n1. **Intro to Data Science: Your Step-by-Step Guide To Starting** (Udemy - Beginner)\n   - *What you'll learn*: Entire Data Science process, Cloud concepts, Database fundamentals\n   - *Skills*: Data Science, Cloud Computing, Databases\n   - [Enroll](https://www.udemy.com/course/intro-to-data-science/)\n2. **Complete Python for data science and cloud computing** (Udemy - All Levels)\n   - *What you'll learn*: Predictive modeling, ML algorithms, result presentation\n   - *Skills*: Python, Machine Learning, Cloud Computing, Data Analysis\n   - [Enroll](https://www.udemy.com/course/complete-python-for-data-science-and-cloud-computing/)\n3. **Data Science Beginner's Course 2020** (Udemy - All Levels)\n   - *What you'll learn*: Basics to advanced methods, step-by-step instruction\n   - *Skills*: Data Analysis, Statistics, Programming, Visualization\n   - [Enroll](https://www.udemy.com/course/complete-data-science-course-go-from-zero-to-hero-a/)\n4. **Data Science 2022: Complete Data Science & Machine Learning** (Udemy - All Levels)\n   - *What you'll learn*: Advanced concepts in Python, Linear Algebra, ML math\n   - *Skills*: Python, ML theory, Calculus, Vectors, Matrices\n   - [Enroll](https://www.udemy.com/course/complete-data-science-and-machine-learning-using-python/)\n5. **The Data Science Course 2022: Complete Data Science Bootcamp** (Udemy - All Levels)\n   - *What you'll learn*: Stats analysis, Python libraries, ML & deep learning, Tableau\n   - *Skills*: NumPy, pandas, matplotlib, scikit-learn, TensorFlow\n   - [Enroll](https://www.udemy.com/course/the-data-science-course-complete-data-science-bootcamp/)\n6. **Most Effective Tips to Get Your Dream Data Science Job** (Udemy - All Levels)\n   - *What you'll learn*: Job market skillset, portfolio tips, career strategies\n   - *Skills*: Python, R, SQL, Visualization, Big Data, Data Mining\n   - [Enroll](https://www.udemy.com/course/most-effective-tips-to-get-your-dream-data-science-job/)\n"},
+    #     {"role": "assistant", "content": "# 💼 Next Steps After Completing Your Learning Path\n\nOnce you've completed these courses, consider:\n1. **Building a portfolio**: 2-3 projects with cloud data pipelines and big data tech.\n2. **Certifications**: Google Cloud Professional Data Engineer, AWS Data Analytics Specialty.\n3. **Community**: Engage on Stack Overflow, Reddit's r/dataengineering, Meetup groups.\n4. **Open source**: Contribute to data engineering repos for visibility.\n\nAny questions about your learning path or next steps?"}
+    # ]
 
     def __init__(self):
         self.conn = None
@@ -438,6 +439,7 @@ class ChatService:
         return "\n".join(prompt_lines)
 
     def answer_career_question(self, question: str, user_context=None):
+        self.CONVERSATION_HISTORY = user_context.get('chat_history', [])
         prompt = self._build_prompt(question)
         return self.get_llm_response(prompt)
     
@@ -488,3 +490,66 @@ class ChatService:
                 f"3. Network with professionals in this field\n"
                 f"4. Update your resume to highlight relevant experience\n"
             )
+        
+    def extract_skills(self, resume_text):
+        """
+        Use LLM to extract skills from resume text.
+        
+        Args:
+            resume_text (str): The resume text to analyze
+            
+        Returns:
+            list: Extracted skills 
+        """
+        prompt = (
+            "Extract all technical skills, soft skills, and domain knowledge from the following resume. "
+            "Return the result as a JSON list of strings containing only the skill names. "
+            "Be comprehensive and include all identifiable skills. "
+            "Do not include explanations, categories, or any other text. Just the JSON list.\n\n"
+            f"Resume text: {resume_text[:4000]}..."  # Truncate for token limits
+        )
+        
+        try:
+            response = self.get_llm_response(prompt)
+            
+            # Extract JSON list from response 
+            # (handles cases where model might add explanatory text)
+            import re
+            json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
+            
+            if json_match:
+                skills_json = f"[{json_match.group(1)}]"
+                skills = json.loads(skills_json)
+                return skills
+            else:
+                # Fallback extraction if JSON parsing fails
+                skills = []
+                for line in response.split('\n'):
+                    line = line.strip().strip('"-,')
+                    if line and not line.startswith('[') and not line.startswith(']'):
+                        skills.append(line)
+                return skills
+                
+        except Exception as e:
+            logger.error(f"❌ Error extracting skills with LLM: {str(e)}")
+            # Extract skills dynamically from resume text using contextual patterns
+            extracted_skills = []
+            
+            # Look for skill sections
+            skill_sections = re.findall(r'(?i)(?:skills|technologies|competencies|proficiencies|tools)(?:[^\n.]*):([^\n]+(?:\n[^\n•*]+)*)', resume_text)
+            
+            for section in skill_sections:
+                # Extract individual skills by splitting on common delimiters
+                skills = re.findall(r'(?:[\s,;:|•]+)([A-Za-z0-9+#/\-._& ]{2,30}?)(?:[\s,;:|•]|$)', section)
+                extracted_skills.extend([s.strip() for s in skills if len(s.strip()) > 2])
+            
+            # Extract programming languages and technologies 
+            tech_pattern = r'\b(?:Python|Java|JavaScript|C\+\+|SQL|HTML|CSS|AWS|Azure|Docker|Kubernetes|Git|React|Angular|Vue|Node\.js|PHP|Ruby|Swift|Go|Rust|MongoDB|MySQL|PostgreSQL|TensorFlow|PyTorch|Pandas|NumPy)\b'
+            tech_skills = re.findall(tech_pattern, resume_text)
+            extracted_skills.extend(tech_skills)
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_skills = [skill for skill in extracted_skills if not (skill in seen or seen.add(skill))]
+            
+            return unique_skills
