@@ -20,27 +20,40 @@ from backend.services.career_transition_service import (
     format_transition_plan
 )
 from backend.services.skill_matcher import extract_skills_from_text
-from backend.database import create_resumes_table # Corrected import
+from backend.database import create_resumes_table, save_chat_history # Added save_chat_history import
 
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, # Changed default level
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("career_transition_debug.log"),
+        logging.FileHandler("career_transition_debug.log", mode='a'), # Append mode
         logging.StreamHandler(sys.stdout)
     ]
 )
 logger = logging.getLogger(__name__)
+now = datetime.now()
 
 def render_career_transition_page(): # Renamed function
     """Main function for the Career Transition feature with resume analysis."""
 
+    # --- Log state at the beginning of each execution ---
+    logger.info(f"--- Entering render_career_transition_page ---")
+    logger.info(f"Current ct_state: {st.session_state.get('ct_state', 'Not Set')}")
+    logger.info(f"Current page: {st.session_state.get('current_page', 'Not Set')}")
+    logger.info(f"CT Messages count: {len(st.session_state.get('ct_messages', []))}")
+    logger.info(f"CT Data keys: {list(st.session_state.get('ct_data', {}).keys())}")
+    # --- End Logging ---
+
     # Add Back button
     if st.button("⬅️ Back to Guidance Hub"):
         st.session_state.current_page = "Guidance Hub"
-        # Clear specific states for this page if needed
-        # e.g., del st.session_state.ct_state, del st.session_state.ct_messages etc.
+        # Clear specific states for this page
+        if 'ct_state' in st.session_state: del st.session_state.ct_state
+        if 'ct_messages' in st.session_state: del st.session_state.ct_messages
+        if 'ct_data' in st.session_state: del st.session_state.ct_data
+        if 'results_displayed' in st.session_state: del st.session_state.results_displayed
+        logger.info("Navigating back to Guidance Hub, resetting CT state.")
         st.rerun()
 
     # Add extra padding at the top
@@ -53,49 +66,64 @@ def render_career_transition_page(): # Renamed function
 
     # Apply custom CSS (Handled globally in main.py)
     # Removed CSS block
+    # Optionally display session state for debugging
+    debug_container.json(st.session_state.to_dict())
 
     # Initialize session state variables
     if "ct_state" not in st.session_state:
         st.session_state.ct_state = "ask_name"
         st.session_state.ct_messages = []
         st.session_state.ct_data = {}
+        st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         logger.info("Initialized career transition session state.")
 
     # Helper function to add messages to the chat
     def add_message(role, content):
+        # Ensure messages list exists
+        if "ct_messages" not in st.session_state: st.session_state.ct_messages = []
         st.session_state.ct_messages.append({"role": role, "content": content})
+        logger.debug(f"Added CT message: {role} - {content[:50]}...") # Optional debug log
 
     # Display chat history
-    for msg in st.session_state.ct_messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    if "ct_messages" in st.session_state:
+        for msg in st.session_state.ct_messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
 
     # === State Machine ===
+    current_ct_state = st.session_state.get("ct_state", "ask_name")
 
     # --- Ask Name --- #
-    if st.session_state.ct_state == "ask_name":
-        if not st.session_state.ct_messages:
+    if current_ct_state == "ask_name":
+        logger.info("Inside 'ask_name' state block.")
+        # Check if messages list exists and is empty
+        if not st.session_state.get("ct_messages", []):
             add_message("assistant", "👋 Hello! I'll help you transition to a new career based on your resume. What's your name?")
+            logger.info("Added initial CT welcome message.")
+            # Rerun needed ONLY to display the very first message
             st.rerun()
 
-        user_input = st.chat_input("Your name")
+        user_input = st.chat_input("Your name", key="ct_user_input") # Added key
         if user_input:
+            logger.info(f"Received name input: {user_input}")
             st.session_state.ct_data["name"] = user_input
             add_message("user", user_input)
             add_message("assistant", f"Nice to meet you, {user_input}! Please upload your resume so I can analyze your current skills.")
             st.session_state.ct_state = "ask_resume"
-            logger.info(f"User name set: {user_input}. Moving to ask_resume state.")
+            logger.info(f"User name set: {user_input}. Updated ct_state to 'ask_resume'. Preparing to rerun.")
             st.rerun()
 
     # --- Ask Resume --- #
-    elif st.session_state.ct_state == "ask_resume":
-        uploaded_file = st.file_uploader("Upload your resume (PDF/DOCX):", type=["pdf", "docx"], key="resume_uploader_ct") # Added key
+    elif current_ct_state == "ask_resume":
+        logger.info("Inside 'ask_resume' state block.")
+        uploaded_file = st.file_uploader("Upload your resume (PDF/DOCX):", type=["pdf", "docx"], key="ct_resume_uploader") # Unique key
         if uploaded_file:
             with st.spinner("Analyzing your resume..."):
                 try:
                     resume_text = extract_text(uploaded_file)
                     if not resume_text or len(resume_text) < 50:
                         add_message("assistant", "⚠️ I couldn't extract enough text from your resume. Please try uploading a different file.")
+                        logger.warning(f"Insufficient text extracted from {uploaded_file.name}")
                         st.rerun()
 
                     st.session_state.ct_data["resume_text"] = resume_text
@@ -125,8 +153,9 @@ def render_career_transition_page(): # Renamed function
                     st.rerun()
 
     # --- Ask Target Role --- #
-    elif st.session_state.ct_state == "ask_target_role":
-        user_input = st.chat_input("E.g., Data Scientist, Software Engineer")
+    elif current_ct_state == "ask_target_role":
+        logger.info("Inside 'ask_target_role' state block.")
+        user_input = st.chat_input("E.g., Data Scientist, Software Engineer", key="ct_target_role_input") # Added key
         if user_input:
             target_role = user_input.strip()
             st.session_state.ct_data["target_role"] = target_role
@@ -142,23 +171,34 @@ def render_career_transition_page(): # Renamed function
                     extracted_skills = st.session_state.ct_data["extracted_skills"]
 
                     # Use the ResumeSearchService from database.py for storage
-                    service = create_resumes_table()
-                    # Assume store_resume needs name, text, skills, target_role (even if missing skills aren't calculated yet)
-                    service.store_resume(name, resume_text, extracted_skills, target_role)
-                    debug_container.info("Initial resume data stored.")
-                    logger.info("Initial resume data stored.")
+                    # NOTE: Decide if storing here is necessary or if it should happen after analysis
+                    # If using create_resumes_table, ensure it has a method like store_initial_resume
+                    # or adapt store_career_analysis to handle potentially missing fields.
+                    # For now, we assume store_career_analysis can handle this or we skip initial storage.
+                    # Example using a hypothetical method:
+                    # service = create_resumes_table()
+                    # service.store_initial_resume(name, resume_text, extracted_skills, target_role)
+                    debug_container.info("Skipping initial resume storage for now.") # Adjusted log
+                    logger.info("Skipping initial resume data storage before full analysis.")
             except Exception as e:
-                logger.error(f"Error storing initial resume data: {str(e)}", exc_info=True)
-                debug_container.warning(f"Could not store initial resume data: {str(e)}")
+                logger.error(f"Error during placeholder initial resume storage: {str(e)}", exc_info=True)
+                debug_container.warning(f"Could not store initial resume data (placeholder): {str(e)}")
                 # Continue analysis despite storage error
 
             st.session_state.ct_state = "analyze_skills"
             st.rerun()
 
     # --- Analyze Skills --- #
-    elif st.session_state.ct_state == "analyze_skills":
+    elif current_ct_state == "analyze_skills":
+        logger.info("Inside 'analyze_skills' state block.")
         # Prevent re-analysis on page refresh if already done
         if "missing_skills" not in st.session_state.ct_data:
+            # Check if the 'Analyzing...' message needs to be added (avoid duplication)
+            last_msg_role = st.session_state.ct_messages[-1]["role"] if st.session_state.get("ct_messages") else None
+            if last_msg_role == "user": # Only add if the last message was the user setting the role
+                 add_message("assistant", f"Analyzing skill gaps for {st.session_state.ct_data.get('target_role', 'the target role')}...")
+                 st.rerun() # Rerun to show the message before the spinner starts
+
             with st.spinner("Analyzing skill gaps and generating recommendations..."):
                 try:
                     name = st.session_state.ct_data["name"]
@@ -178,6 +218,7 @@ def render_career_transition_page(): # Renamed function
                     debug_container.write("Storing career analysis data...")
                     # Ensure store_career_analysis is robust and returns an ID or handles errors
                     try:
+                        # Assuming store_career_analysis is the correct function now
                         resume_id = store_career_analysis(
                             username=name,
                             resume_text=resume_text,
@@ -228,14 +269,20 @@ def render_career_transition_page(): # Renamed function
                     # Clean up potentially partial analysis data
                     if "missing_skills" in st.session_state.ct_data: del st.session_state.ct_data["missing_skills"]
                     if "courses" in st.session_state.ct_data: del st.session_state.ct_data["courses"]
+                    if "resume_id" in st.session_state.ct_data: del st.session_state.ct_data["resume_id"]
                     st.rerun()
         else:
              # If analysis already done, just ensure we are in display state
-             st.session_state.ct_state = "display_results"
-             # No rerun needed
+             if st.session_state.ct_state != "display_results":
+                 logger.info("Analysis already done, ensuring state is display_results.")
+                 st.session_state.ct_state = "display_results"
+                 st.rerun() # Rerun if state was wrong
+             else:
+                 logger.info("Analysis already done, state is correct (display_results).")
 
     # --- Display Results --- #
-    elif st.session_state.ct_state == "display_results":
+    elif current_ct_state == "display_results":
+        logger.info("Inside 'display_results' state block.")
         if "results_displayed" not in st.session_state:
             logger.info("Displaying career transition results.")
             name = st.session_state.ct_data.get("name", "User")
@@ -247,10 +294,13 @@ def render_career_transition_page(): # Renamed function
             courses_list = []
             if not courses_df.empty:
                 try:
+                    # Ensure columns are suitable for to_dict('records')
+                    # Example: Rename columns if they cause issues
+                    # courses_df.columns = ['title', 'url', 'description']
                     courses_list = courses_df.to_dict('records')
                 except Exception as e:
                     logger.error(f"Error converting courses DataFrame to dict: {e}")
-                    debug_container.warning("Could not format course data for display.")
+                    debug_container.warning(f"Could not format course data for display: {e}")
 
             # Use formatting function for consistent UI
             try:
@@ -278,9 +328,13 @@ def render_career_transition_page(): # Renamed function
                  logger.error(f"Error formatting transition plan: {e}", exc_info=True)
                  debug_container.error(f"Error formatting results: {e}")
                  # Display raw data as fallback
-                 add_message("assistant", f"**Skill Assessment:**\nCurrent Skills: {extracted_skills}\nMissing Skills for {target_role}: {missing_skills}")
+                 add_message("assistant", f"**Skill Assessment:**\nCurrent Skills: {json.dumps(extracted_skills)}\nMissing Skills for {target_role}: {json.dumps(missing_skills)}")
                  if not courses_df.empty:
-                     add_message("assistant", f"**Course Recommendations:**\n{courses_df.to_string()}")
+                     try:
+                         add_message("assistant", f"**Course Recommendations:**\n{courses_df.to_string()}")
+                     except Exception as df_e:
+                         add_message("assistant", f"**Course Recommendations:** Could not display DataFrame: {df_e}")
+                         logger.error(f"Could not display courses DataFrame: {df_e}")
                  else:
                      add_message("assistant", "No specific courses found.")
                  add_message("assistant", "Focus on bridging the identified skill gaps through projects and learning.")
@@ -289,56 +343,67 @@ def render_career_transition_page(): # Renamed function
             st.rerun() # Rerun once to display all messages
 
         # Handle follow-up questions
-        user_input = st.chat_input("Ask a question about your career transition plan")
+        user_input = st.chat_input("Ask a question about your career transition plan", key="ct_followup_input") # Added key
         if user_input:
             add_message("user", user_input)
             logger.info(f"User asked follow-up question: {user_input}")
 
-            with st.spinner("Generating response..."):
+            with st.spinner("Thinking..."):
                 try:
-                    # Context for the LLM
-                    context_prompt = (
-                        f"You are a career coach helping {st.session_state.ct_data.get('name', 'someone')} transition to a {st.session_state.ct_data.get('target_role', 'new')} role. "
-                        f"Their current skills include: {', '.join(st.session_state.ct_data.get('extracted_skills',[]))}. "
-                        f"They need to learn: {', '.join(st.session_state.ct_data.get('missing_skills',[]))}. "
-                        f"Answer the user's question concisely and provide actionable advice related to their transition plan."
-                    )
+                    # Create context for the chat service
+                    user_context = {
+                        'name': st.session_state.ct_data.get('name', 'User'),
+                        'target_role': st.session_state.ct_data.get('target_role', 'Unknown'),
+                        'skills': list(st.session_state.ct_data.get('missing_skills', {})),
+                        'chat_history': st.session_state.ct_messages
+                        # Optionally add course info if relevant to context
+                        # 'courses': st.session_state.lp_data.get("courses", pd.DataFrame()).to_dict('records')
+                    }
 
-                    chat_service = ChatService()
-                    followup_response = chat_service.get_llm_response(
-                        prompt=user_input,
-                        context=context_prompt,
-                        max_retries=2
-                    )
+                    chat_service = ChatService() # Initialize here or use session state
+                    followup_response = chat_service.answer_career_question(user_input, user_context)
                     add_message("assistant", followup_response)
                     logger.info("Generated follow-up response.")
                 except Exception as e:
                     logger.error(f"Error generating follow-up response: {str(e)}", exc_info=True)
                     debug_container.error(f"Error generating response: {str(e)}")
-                    add_message("assistant", f"To answer your question about {user_input}: Focus on building the specific skills I recommended for a {st.session_state.ct_data.get('target_role', 'new')} role, especially through practical projects and courses that directly address your skill gaps.")
+                    add_message("assistant", "I'm having trouble processing your question right now. Could you try asking in a different way or focusing on the provided path?")
 
-            st.rerun()
+            st.rerun() # Rerun to display the new messages
 
-    # --- Fallback for unexpected state --- #
-    else:
-        logger.error(f"Reached unexpected career transition state: {st.session_state.ct_state}")
-        st.error("Something went wrong. Resetting career transition assistant.")
-        # Reset state
-        st.session_state.ct_state = "ask_name"
-        st.session_state.ct_messages = []
-        st.session_state.ct_data = {}
-        if "results_displayed" in st.session_state:
-            del st.session_state.results_displayed
-        st.rerun()
-
-    # Add restart button in the sidebar (logic moved to dashboard.py)
-    # Consider adding reset button within the page
-    if st.button("Restart Career Transition Analysis"):
-        logger.info("User initiated career transition reset from page button.")
+    # --- Sidebar Actions ---
+    st.sidebar.divider()
+    st.sidebar.header("Chat Controls")
+    if st.sidebar.button("🔄 Restart Analysis"):
+        logger.info("User initiated career transition reset from sidebar button.")
         # Reset chat state
         st.session_state.ct_state = "ask_name"
         st.session_state.ct_messages = []
         st.session_state.ct_data = {}
+        st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         if "results_displayed" in st.session_state:
             del st.session_state.results_displayed
-        st.rerun() 
+        save_chat_history(
+            user_name=st.session_state.ct_data.get("name", "User"),
+            chat_history=st.session_state.ct_messages,
+            cur_timestamp=st.session_state.cur_timestamp
+        )
+        st.rerun()
+
+    if st.sidebar.button("⏹️ End Chat"):
+        logger.info("User clicked End Chat from sidebar button.")
+        st.session_state.current_page = "Dashboard"
+        # Save chat history
+        save_chat_history(
+            user_name=st.session_state.ct_data.get("name", "User"),
+            chat_history=st.session_state.ct_messages,
+            cur_timestamp=st.session_state.cur_timestamp
+        )
+        # Clear specific states for this page
+        if 'ct_state' in st.session_state: del st.session_state.ct_state
+        if 'ct_messages' in st.session_state: del st.session_state.ct_messages
+        if 'ct_data' in st.session_state: del st.session_state.ct_data
+        if 'results_displayed' in st.session_state: del st.session_state.results_displayed
+        if 'cur_timestamp' in st.session_state: del st.session_state.cur_timestamp
+        logger.info("Navigating back to Guidance Hub, resetting CT state.")
+        st.rerun()

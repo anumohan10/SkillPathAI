@@ -84,7 +84,7 @@ def process_missing_skills(extracted_skills: List[str], target_role: str) -> Lis
         )
         
         # Use a more comprehensive approach to get better results
-        response = chat_service.get_llm_response(prompt, max_retries=2)
+        response = chat_service.get_llm_response(prompt)
         
         # Check if response contains an error message
         if "having trouble" in response or "sorry" in response.lower() or "I can't" in response:
@@ -95,7 +95,7 @@ def process_missing_skills(extracted_skills: List[str], target_role: str) -> Lis
                 f"Return only a JSON array."
             )
             
-            response = chat_service.get_llm_response(simple_prompt, max_retries=1)
+            response = chat_service.get_llm_response(simple_prompt)
             
             # If still getting errors, use role-specific defaults
             if "having trouble" in response or "sorry" in response.lower() or "I can't" in response:
