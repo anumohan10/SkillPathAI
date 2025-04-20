@@ -421,10 +421,10 @@ class ChatService:
                     cur.execute(query)
                     resp = cur.fetchone()[0]
                     if resp and resp.strip():
-                        return resp
+                        return True, resp
             except Exception as e:
                 logger.warning(f"Model {model} failed: {e}")
-        return "Sorry, I'm having trouble generating a response right now."
+        return False, "Sorry, I'm having trouble generating a response right now."
 
     def _build_prompt(self, question: str) -> str:
         # Insert system instruction first

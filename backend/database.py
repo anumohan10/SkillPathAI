@@ -59,14 +59,14 @@ def save_chat_history(user_name, chat_history, cur_timestamp):
     if conn:
         try:
             cur = conn.cursor()
-            create_table_query = """
-            CREATE TABLE IF NOT EXISTS chat_history (
-                user_name VARCHAR(255),
-                chat_history VARCHAR,
-                cur_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-            );
-            """
-            cur.execute(create_table_query)
+            # create_table_query = """
+            # CREATE TABLE IF NOT EXISTS chat_history (
+            #     user_name VARCHAR(255),
+            #     chat_history VARCHAR,
+            #     cur_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+            # );
+            # """
+            # cur.execute(create_table_query)
             insert_query = """
             INSERT INTO chat_history (user_name, chat_history, cur_timestamp)
             VALUES (%s, %s, %s);
@@ -74,8 +74,10 @@ def save_chat_history(user_name, chat_history, cur_timestamp):
             cur.execute(insert_query, (user_name, json.dumps(chat_history), cur_timestamp))
             conn.commit()
             logger.info("✅ Chat history saved to Snowflake.")
+            return True, "Chat history saved successfully"
         except Exception as e:
             logger.error(f"❌ Error saving chat history: {e}")
+            return False, f"Database error: {e}"
         finally:
             cur.close()
             conn.close()

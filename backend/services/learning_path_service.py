@@ -124,11 +124,11 @@ def store_learning_path(data):
         
         conn.commit()
         logger.info(f"Successfully stored learning path data for {name}")
-        return True
+        return data["record_id"]
         
     except Exception as e:
         logger.error(f"Failed to store learning path: {str(e)}")
-        return False
+        return None
     finally:
         cursor.close()
         conn.close()

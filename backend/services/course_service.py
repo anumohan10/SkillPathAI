@@ -134,7 +134,9 @@ def get_course_recommendations(target_role, user_id=None, resume_id=None):
                             rating_value = int(rating) if isinstance(rating, (str, int, float)) else 0
                             if rating_value <= 2:
                                 low_rated_skills.append(skill)
-                        
+                        # TODO: Check what happens when user_id is None - need to handle this case gracefully
+                        # Currently, if user_id is None, we skip this entire section and continue without skill ratings
+                        # We might want to implement a fallback strategy or default recommendations
                         if low_rated_skills:
                             skill_query = f" Focus on courses that teach {', '.join(low_rated_skills)}."
                             logger.debug(f"Added skill focus to query: {skill_query}")
@@ -216,7 +218,7 @@ def get_course_recommendations(target_role, user_id=None, resume_id=None):
             if valid_courses.empty and not df.empty:
                 logger.warning("Query returned rows but no valid courses with both name and URL")
                 
-        return df
+        return df.to_dict('records')
             
     except Exception as e:
         logger.error(f"Error in get_recommended_courses: {str(e)}", exc_info=True)
