@@ -8,3 +8,4 @@ backend/services/__pycache__
 **/*.py[cod]
 **/*.log
 frontend/pages/__pycache__/learning_path.cpython-312.pyc
+.cursor/
