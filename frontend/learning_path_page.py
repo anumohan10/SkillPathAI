@@ -5,17 +5,13 @@ import json
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import requests
 
 # Ensure backend services can be imported
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import backend services
-from backend.services.learning_path_service import store_learning_path
-from backend.services.skill_service import get_top_skills_for_role
-from backend.services.course_service import get_course_recommendations
 from frontend.ui_service import format_course_message, format_introduction, format_career_advice, format_skills_for_display
-from backend.services.chat_service import ChatService
-from backend.database import save_chat_history
 
 # Set up logging (consider moving configuration to a central place)
 logging.basicConfig(
@@ -29,6 +25,139 @@ logging.basicConfig(
 logger = logging.getLogger(__name__) # Use __name__ for logger
 now = datetime.now()
 
+def save_chat_history_api(user_name, chat_history, cur_timestamp):
+    """Save chat history to the database."""
+    try:
+        # Call the API endpoint to save chat history
+        response = requests.post(
+            "http://localhost:8000/user-input/chat-history",
+            json={
+                "user_name": user_name,
+                "chat_history": chat_history, 
+                "timestamp": cur_timestamp
+            }
+        )
+        if response.status_code == 200:
+            logger.info("Chat history saved successfully")
+        else:
+            logger.error(f"Failed to save chat history: {response.status_code}")
+    except Exception as e:
+        logger.error(f"Error saving chat history: {str(e)}", exc_info=True)
+
+def get_top_skills_for_role_api(target_role):
+    """Call the API to get top skills for a role."""
+    try:
+        # Call the API endpoint to get top skills
+        response = requests.get(
+            f"http://localhost:8000/recommendations/skills/top/{target_role}"
+        )
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success", False):
+                logger.info(f"Successfully retrieved {len(data['skills'])} skills for {target_role}")
+                return data["skills"]
+            else:
+                logger.warning(f"API returned no skills for role {target_role}: {data.get('message')}")
+                return []
+        else:
+            logger.error(f"API error getting skills for {target_role}: {response.status_code}")
+            return []
+    except Exception as e:
+        logger.error(f"Error calling skills API: {str(e)}", exc_info=True)
+        return []
+
+def get_course_recommendations_api(target_role, user_id=None):
+    """Call the API to get course recommendations for a role."""
+    try:
+        # Call the API endpoint to get course recommendations
+        response = requests.post(
+            f"http://localhost:8000/recommendations/courses",
+            json={"role": target_role, "user_id": user_id, "limit": 5}
+        )
+        if response.status_code == 200:
+            courses = response.json()
+            # Convert to DataFrame
+            return pd.DataFrame(courses)
+        else:
+            logger.error(f"API error getting courses: {response.status_code}")
+            return pd.DataFrame()
+    except Exception as e:
+        logger.error(f"Error calling courses API: {str(e)}", exc_info=True)
+        return pd.DataFrame()
+
+def store_skill_ratings_api(learning_path_data):
+    """Call the API to store learning path data."""
+    try:
+        # Prepare data for API call
+        api_data = {
+            "name": learning_path_data.get("name", "Unknown"),
+            "target_role": learning_path_data.get("target_role", "Unknown Role"),
+            "top_skills": learning_path_data.get("top_skills", []),
+            "skill_ratings": learning_path_data.get("skill_ratings", {})
+        }
+        
+        # # If courses exist and it's a DataFrame, convert to dict
+        # courses = learning_path_data.get("courses")
+        # if isinstance(courses, pd.DataFrame) and not courses.empty:
+        #     api_data["courses"] = courses.to_dict('records')
+        
+        # Call the API endpoint
+        response = requests.post(
+            "http://localhost:8000/user-input/skill-ratings/store",
+            json=api_data
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info(f"Successfully stored learning path, record ID: {data.get('record_id')}")
+                return data.get('record_id')
+            else:
+                logger.warning(f"Learning path API returned failure: {data.get('message')}")
+                return None
+        else:
+            logger.error(f"API error storing learning path: {response.status_code}")
+            return None
+    except Exception as e:
+        logger.error(f"Error calling learning path storage API: {str(e)}", exc_info=True)
+        return None
+
+def answer_career_question_api(question, user_context):
+    """Call the API to get an answer to a career-related question."""
+    try:
+        # Prepare request data
+        request_data = {
+            "question": question,
+            "user_context": user_context
+        }
+        
+        # Call the API endpoint
+        response = requests.post(
+            "http://localhost:8000/user-input/career-question",
+            json=request_data
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("response", "I'm sorry, I couldn't find an answer.")
+        else:
+            # Extract error message from response if possible
+            try:
+                error_data = response.json()
+                error_msg = error_data.get("detail", "Unknown error")
+                logger.error(f"API error ({response.status_code}): {error_msg}")
+                
+                # For service unavailable errors, we can show a more specific message
+                if response.status_code == 503:
+                    return f"I'm having trouble with that question: {error_msg}"
+                else:
+                    return "I'm sorry, there was an error processing your question."
+            except:
+                logger.error(f"Failed to parse error response: {response.status_code}, {response.text}")
+                return "I'm sorry, there was an error processing your question."
+    except Exception as e:
+        logger.error(f"Error calling career question API: {str(e)}", exc_info=True)
+        return "I'm sorry, I'm having trouble connecting to the service right now."
 
 def render_learning_path_page(): # Renamed function
     """Main function for the Learning Path chat feature with proper error handling."""
@@ -45,9 +174,9 @@ def render_learning_path_page(): # Renamed function
         st.session_state.current_page = "Guidance Hub"
         # Save chat history before clearing
         if 'lp_messages' in st.session_state and len(st.session_state.lp_messages) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history(
+            save_chat_history_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.lp_messages),
+                chat_history=st.session_state.lp_messages,
                 cur_timestamp=st.session_state.cur_timestamp
             )
             logger.info("Saved chat history on navigation back (results were displayed)")
@@ -132,7 +261,7 @@ def render_learning_path_page(): # Renamed function
 
             with st.spinner("Identifying key skills for this role..."):
                 try:
-                    top_skills = get_top_skills_for_role(target_role)
+                    top_skills = get_top_skills_for_role_api(target_role)
                     if not top_skills: # Handle case where no skills are found
                         logger.warning(f"No top skills found for role: {target_role}")
                         add_message("assistant", f"I couldn't find specific top skills for '{target_role}'. Let's try defining some key areas manually. What are 5 important skills or topics for this role?")
@@ -250,12 +379,11 @@ def render_learning_path_page(): # Renamed function
                 # Store the learning path data first (optional, depends on whether ID is needed for courses)
                 try:
                     debug_container.write("Storing learning path data...")
-                    store_result = store_learning_path(st.session_state.lp_data)
+                    store_result = store_skill_ratings_api(st.session_state.lp_data)
                     if store_result:
-                        # Store record_id back into session state if needed
                         debug_container.success("Learning path stored successfully")
                         # Get the ID from the stored data
-                        user_id = st.session_state.lp_data.get("record_id")
+                        user_id = store_result
                         debug_container.write(f"Using record ID: {user_id}")
                     else:
                         debug_container.warning("Learning path stored, but no ID returned.")
@@ -269,7 +397,7 @@ def render_learning_path_page(): # Renamed function
                 # Get recommended courses
                 try:
                     debug_container.write("Fetching course recommendations...")
-                    courses_df = get_course_recommendations(target_role, user_id)
+                    courses_df = get_course_recommendations_api(target_role, user_id)
                     debug_container.success(f"Retrieved {len(courses_df)} course recommendations.")
                     logger.info(f"Retrieved {len(courses_df)} course recommendations for role '{target_role}'.")
                     st.session_state.lp_data["courses"] = courses_df
@@ -337,7 +465,7 @@ def render_learning_path_page(): # Renamed function
                 add_message("assistant", "Let's start fresh with a new learning path analysis!")
                 # Save chat history before resetting
                 if st.session_state.get('results_displayed', False):
-                    save_chat_history(
+                    save_chat_history_api(
                         user_name=st.session_state.get("username", "User"),
                         chat_history=json.dumps(st.session_state.lp_messages),
                         cur_timestamp=st.session_state.cur_timestamp
@@ -365,8 +493,8 @@ def render_learning_path_page(): # Renamed function
                         # 'courses': st.session_state.lp_data.get("courses", pd.DataFrame()).to_dict('records')
                     }
 
-                    chat_service = ChatService() # Initialize here or use session state
-                    followup_response = chat_service.answer_career_question(user_input, user_context)
+                    # Use API instead of direct function call
+                    followup_response = answer_career_question_api(user_input, user_context)
                     add_message("assistant", followup_response)
                     logger.info("Generated follow-up response.")
                 except Exception as e:
@@ -396,7 +524,7 @@ def render_learning_path_page(): # Renamed function
         logger.info("User initiated learning path reset from sidebar button.")
         # Save chat history before resetting
         if len(st.session_state.get("lp_messages", [])) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history(
+            save_chat_history_api(
                 user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.lp_messages),
                 cur_timestamp=st.session_state.cur_timestamp
@@ -416,7 +544,7 @@ def render_learning_path_page(): # Renamed function
         st.session_state.current_page = "Dashboard"
         # Save chat history
         if st.session_state.get('results_displayed', False):
-            save_chat_history(
+            save_chat_history_api(
                 user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.lp_messages),
                 cur_timestamp=st.session_state.cur_timestamp

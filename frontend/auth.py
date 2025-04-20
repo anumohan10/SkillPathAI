@@ -3,11 +3,11 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import streamlit as st
-from backend.services.auth_service import (
-    hash_password, check_password,
-    create_users_table, insert_user,
-    get_user_by_username
-)
+import requests
+import json
+
+# Define API URL - should be configurable in production
+API_URL = "http://localhost:8000"
 
 # Load custom CSS from styles.css
 with open("styles.css", "r") as f:
@@ -27,24 +27,32 @@ def login_page():
             submit = st.form_submit_button("Login")
 
             if submit:
-                user = get_user_by_username(username)
-                if user and check_password(password, user["password"]):
-                    st.session_state["authenticated"] = True
-                    st.session_state["username"] = username
-                    st.session_state["user_id"] = user["user_id"]
-                    st.session_state["name"] = user["name"]
-                    st.success("Login successful!")
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password.")
+                try:
+                    # Call the API instead of direct function call
+                    response = requests.post(
+                        f"{API_URL}/auth/login",
+                        json={"username": username, "password": password}
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        st.session_state["authenticated"] = True
+                        st.session_state["username"] = username
+                        st.session_state["user_id"] = data["user"]["user_id"]
+                        st.session_state["name"] = data["user"]["name"]
+                        st.session_state["token"] = data["access_token"]
+                        st.success("Login successful!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid username or password.")
+                except Exception as e:
+                    st.error(f"Error connecting to the API: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Sign Up Page ---
 def signup_page():
     st.title("SkillPath - Career Transition Platform")
     st.header("Sign Up")
-
-    # create_users_table()  # Ensure the users table exists
 
     with st.container():
         st.markdown('<div class="container-card">', unsafe_allow_html=True)
@@ -61,14 +69,29 @@ def signup_page():
                     st.error("Please fill in all fields.")
                 elif new_password != confirm_password:
                     st.error("Passwords do not match!")
-                elif get_user_by_username(new_username):
-                    st.error("Username already exists.")
                 else:
-                    hashed_password = hash_password(new_password)
-                    user_id = insert_user(new_name, new_username, new_email, hashed_password)
-                    st.success("Sign-up successful! Please log in.")
-                    st.session_state["auth_page"] = "Login"
-                    st.session_state["user_id"] = user_id
-                    st.session_state["name"] = new_name
-                    st.rerun()
+                    try:
+                        # Call the API instead of direct function call
+                        response = requests.post(
+                            f"{API_URL}/auth/signup",
+                            json={
+                                "name": new_name,
+                                "username": new_username,
+                                "email": new_email,
+                                "password": new_password
+                            }
+                        )
+                        
+                        if response.status_code == 201:
+                            data = response.json()
+                            st.success("Sign-up successful! Please log in.")
+                            st.session_state["auth_page"] = "Login"
+                            st.rerun()
+                        elif response.status_code == 400:
+                            error_data = response.json()
+                            st.error(error_data.get("detail", "Username already exists."))
+                        else:
+                            st.error("An error occurred during sign up.")
+                    except Exception as e:
+                        st.error(f"Error connecting to the API: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)
