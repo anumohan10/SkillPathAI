@@ -135,7 +135,7 @@ def format_introduction(target_role, skill_ratings):
         str: A markdown-formatted introduction
     """
     intro_text = f"""
-# 🚀 Your Personalized Data Engineering Learning Path
+# 🚀 Your Personalized Learning Path
 
 Based on your current skill assessment, I've curated courses that will help you advance your career as a **{target_role}**. These recommendations focus on strengthening your skills in:
 
@@ -155,12 +155,19 @@ The learning path is organized from beginner to advanced courses, designed for c
 """
     return intro_text
 
+
 def format_career_advice():
     """
     Format career advice for after completing the learning path.
     
     Returns:
         str: A markdown-formatted career advice message
+        
+    TODO: Refactor this function to remove hardcoded career advice.
+    This should be moved to a configuration file or database to make it:
+    1. Role-specific (currently only shows data engineering advice)
+    2. Easier to update without code changes
+    3. Potentially personalized based on user's skill assessment
     """
     return """
 # 💼 Next Steps After Completing Your Learning Path
