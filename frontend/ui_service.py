@@ -1,4 +1,4 @@
-# File: backend/services/ui_service.py
+# File: frontend/ui_service.py
 import logging
 import pandas as pd
 
@@ -174,3 +174,23 @@ Once you've completed the courses in your learning path, consider these steps to
 
 Do you have any questions about your learning path or career next steps?
 """
+
+def format_skills_for_display(skill_ratings):
+    """
+    Format skill ratings for display in the UI.
+    
+    Args:
+        skill_ratings (dict): A dictionary of skill ratings
+        
+    Returns:
+        str: HTML/Markdown formatted skill assessment
+    """
+    if not skill_ratings:
+        return "No skills have been rated yet."
+        
+    skill_assessment = "### Your Current Skills Assessment\n\n"
+    for skill, rating in skill_ratings.items():
+        stars = "★" * rating + "☆" * (5 - rating)
+        skill_assessment += f"- **{skill}**: {stars} ({rating}/5)\n"
+        
+    return skill_assessment

@@ -20,7 +20,7 @@ from backend.services.career_transition_service import (
     format_transition_plan
 )
 from backend.services.skill_matcher import extract_skills_from_text
-from backend.database import create_resumes_table, save_chat_history # Added save_chat_history import
+from backend.database import create_resumes_table, save_chat_history 
 
 # Set up logging
 logging.basicConfig(
@@ -48,11 +48,22 @@ def render_career_transition_page(): # Renamed function
     # Add Back button
     if st.button("⬅️ Back to Guidance Hub"):
         st.session_state.current_page = "Guidance Hub"
+        # Save chat history before clearing
+        if 'ct_messages' in st.session_state and len(st.session_state.ct_messages) > 0 and st.session_state.get('results_displayed', False):
+            save_chat_history(
+                user_name=st.session_state.get("username", "User"),
+                chat_history=json.dumps(st.session_state.ct_messages),
+                cur_timestamp=st.session_state.cur_timestamp
+            )
+            logger.info("Saved chat history on navigation back (results were displayed)")
+        else:
+            logger.info("No chat history to save on navigation back (results were not displayed)")
         # Clear specific states for this page
         if 'ct_state' in st.session_state: del st.session_state.ct_state
         if 'ct_messages' in st.session_state: del st.session_state.ct_messages
         if 'ct_data' in st.session_state: del st.session_state.ct_data
         if 'results_displayed' in st.session_state: del st.session_state.results_displayed
+        if 'cur_timestamp' in st.session_state: del st.session_state.cur_timestamp
         logger.info("Navigating back to Guidance Hub, resetting CT state.")
         st.rerun()
 
@@ -343,10 +354,30 @@ def render_career_transition_page(): # Renamed function
             st.rerun() # Rerun once to display all messages
 
         # Handle follow-up questions
-        user_input = st.chat_input("Ask a question about your career transition plan", key="ct_followup_input") # Added key
+        user_input = st.chat_input("Ask a question about your career transition plan or type 'restart' to begin again", key="ct_followup_input") # Added key
         if user_input:
             add_message("user", user_input)
             logger.info(f"User asked follow-up question: {user_input}")
+
+            # Check if user wants to restart
+            if user_input.lower() in ['restart', 'start over', 'reset']:
+                add_message("assistant", "Let's start fresh with a new career transition analysis!")
+                # Save chat history before resetting
+                if st.session_state.get('results_displayed', False):
+                    save_chat_history(
+                        user_name=st.session_state.get("username", "User"),
+                        chat_history=json.dumps(st.session_state.ct_messages),
+                        cur_timestamp=st.session_state.cur_timestamp
+                    )
+                    logger.info("Saved chat history on restart via chat (results were displayed)")
+                # Reset session state
+                st.session_state.ct_state = "ask_name"
+                st.session_state.ct_messages = []
+                st.session_state.ct_data = {}
+                st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+                if "results_displayed" in st.session_state:
+                    del st.session_state.results_displayed
+                st.rerun()
 
             with st.spinner("Thinking..."):
                 try:
@@ -371,11 +402,32 @@ def render_career_transition_page(): # Renamed function
 
             st.rerun() # Rerun to display the new messages
 
+    # --- Fallback for unexpected state --- #
+    else:
+        logger.error(f"Reached unexpected career transition state: {current_ct_state}")
+        st.error("Something went wrong. Resetting career transition conversation.")
+        # Reset state
+        st.session_state.ct_state = "ask_name"
+        st.session_state.ct_messages = []
+        st.session_state.ct_data = {}
+        st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+        if "results_displayed" in st.session_state:
+            del st.session_state.results_displayed
+        st.rerun()
+
     # --- Sidebar Actions ---
     st.sidebar.divider()
     st.sidebar.header("Chat Controls")
     if st.sidebar.button("🔄 Restart Analysis"):
         logger.info("User initiated career transition reset from sidebar button.")
+        # Save chat history before resetting
+        if len(st.session_state.get("ct_messages", [])) > 0 and st.session_state.get('results_displayed', False):
+            save_chat_history(
+                user_name=st.session_state.get("username", "User"),
+                chat_history=json.dumps(st.session_state.ct_messages),
+                cur_timestamp=st.session_state.cur_timestamp
+            )
+            logger.info("Saved chat history on sidebar restart (results were displayed)")
         # Reset chat state
         st.session_state.ct_state = "ask_name"
         st.session_state.ct_messages = []
@@ -383,22 +435,19 @@ def render_career_transition_page(): # Renamed function
         st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         if "results_displayed" in st.session_state:
             del st.session_state.results_displayed
-        save_chat_history(
-            user_name=st.session_state.ct_data.get("name", "User"),
-            chat_history=st.session_state.ct_messages,
-            cur_timestamp=st.session_state.cur_timestamp
-        )
         st.rerun()
 
     if st.sidebar.button("⏹️ End Chat"):
         logger.info("User clicked End Chat from sidebar button.")
         st.session_state.current_page = "Dashboard"
         # Save chat history
-        save_chat_history(
-            user_name=st.session_state.ct_data.get("name", "User"),
-            chat_history=st.session_state.ct_messages,
-            cur_timestamp=st.session_state.cur_timestamp
-        )
+        if st.session_state.get('results_displayed', False):
+            save_chat_history(
+                user_name=st.session_state.get("username", "User"),
+                chat_history=json.dumps(st.session_state.ct_messages),
+                cur_timestamp=st.session_state.cur_timestamp
+            )
+            logger.info("Saved chat history on end chat (results were displayed)")
         # Clear specific states for this page
         if 'ct_state' in st.session_state: del st.session_state.ct_state
         if 'ct_messages' in st.session_state: del st.session_state.ct_messages

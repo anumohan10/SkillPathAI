@@ -5,21 +5,22 @@ import streamlit as st
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from backend.services.resume_parser import extract_text
-from backend.services.cortex_service import ResumeSearchService
-from backend.services.chat_service import ChatService
-from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
-from frontend.components.career_chat import CareerChat
-from backend.services.learning_path_service import get_learning_path
+# from backend.services.resume_parser import extract_text
+# from backend.services.cortex_service import ResumeSearchService
+# from backend.services.chat_service import ChatService
+# from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
+# from frontend.components.career_chat import CareerChat
+# from backend.services.learning_path_service import get_learning_path
 #from frontend.pages.learning_path import display_learning_path
 
 # Import page rendering functions
-from frontend.pages.dashboard_page import render_dashboard_page
-from frontend.pages.profile_page import render_profile_page
-from frontend.pages.courses_page import render_courses_page
-from frontend.pages.guidance_hub_page import render_guidance_hub_page
-from frontend.pages.learning_path_page import render_learning_path_page
-from frontend.pages.career_transition_page import render_career_transition_page
+# Import page rendering functions
+from frontend.dashboard_page import render_dashboard_page
+from frontend.profile_page import render_profile_page
+from frontend.courses_page import render_courses_page
+from frontend.guidance_hub_page import render_guidance_hub_page
+from frontend.learning_path_page import render_learning_path_page
+from frontend.career_transition_page import render_career_transition_page
 
 # Load custom CSS from styles.css
 with open("styles.css", "r") as f:

@@ -11,9 +11,9 @@ from datetime import datetime
 
 # Import backend services
 from backend.services.learning_path_service import store_learning_path
-from backend.services.skill_service import get_top_skills_for_role, format_skills_for_display
+from backend.services.skill_service import get_top_skills_for_role
 from backend.services.course_service import get_course_recommendations
-from backend.services.ui_service import format_course_message, format_introduction, format_career_advice
+from frontend.ui_service import format_course_message, format_introduction, format_career_advice, format_skills_for_display
 from backend.services.chat_service import ChatService
 from backend.database import save_chat_history
 
@@ -40,14 +40,13 @@ def render_learning_path_page(): # Renamed function
     logger.info(f"LP Messages count: {len(st.session_state.get('lp_messages', []))}")
     logger.info(f"LP Data keys: {list(st.session_state.get('lp_data', {}).keys())}")
     # --- End Logging --- 
-
     # Add Back button
     if st.button("⬅️ Back to Guidance Hub"):
         st.session_state.current_page = "Guidance Hub"
         # Save chat history before clearing
         if 'lp_messages' in st.session_state and len(st.session_state.lp_messages) > 0 and st.session_state.get('results_displayed', False):
             save_chat_history(
-                user_name=st.session_state.lp_data.get("name", "User"),
+                user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.lp_messages),
                 cur_timestamp=st.session_state.cur_timestamp
             )
@@ -339,7 +338,7 @@ def render_learning_path_page(): # Renamed function
                 # Save chat history before resetting
                 if st.session_state.get('results_displayed', False):
                     save_chat_history(
-                        user_name=st.session_state.lp_data.get("name", "User"),
+                        user_name=st.session_state.get("username", "User"),
                         chat_history=json.dumps(st.session_state.lp_messages),
                         cur_timestamp=st.session_state.cur_timestamp
                     )
@@ -398,7 +397,7 @@ def render_learning_path_page(): # Renamed function
         # Save chat history before resetting
         if len(st.session_state.get("lp_messages", [])) > 0 and st.session_state.get('results_displayed', False):
             save_chat_history(
-                user_name=st.session_state.lp_data.get("name", "User"),
+                user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.lp_messages),
                 cur_timestamp=st.session_state.cur_timestamp
             )
@@ -418,7 +417,7 @@ def render_learning_path_page(): # Renamed function
         # Save chat history
         if st.session_state.get('results_displayed', False):
             save_chat_history(
-                user_name=st.session_state.lp_data.get("name", "User"),
+                user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.lp_messages),
                 cur_timestamp=st.session_state.cur_timestamp
             )
