@@ -6,7 +6,7 @@ import streamlit as st
 from backend.services.auth_service import (
     hash_password, check_password,
     create_users_table, insert_user,
-    get_user_by_username
+    get_user_by_username, update_user_password
 )
 
 # Load custom CSS from styles.css
@@ -28,15 +28,51 @@ def login_page():
 
             if submit:
                 user = get_user_by_username(username)
-                if user and check_password(password, user["password"]):
-                    st.session_state["authenticated"] = True
-                    st.session_state["username"] = username
-                    st.session_state["user_id"] = user["user_id"]
-                    st.session_state["name"] = user["name"]
-                    st.success("Login successful!")
-                    st.rerun()
+                if user:
+                    if check_password(password, user["password"]):
+                        st.session_state["authenticated"] = True
+                        st.session_state["username"] = username
+                        st.session_state["user_id"] = user["user_id"]
+                        st.session_state["name"] = user["name"]
+                        st.success("Login successful! Redirecting to dashboard...")
+                        st.rerun()
+                    else:
+                        st.error("Incorrect password. Please try again.")
                 else:
-                    st.error("Invalid username or password.")
+                    st.error("Account does not exist. Please sign up first.")
+        st.markdown('</div>', unsafe_allow_html=True)
+    if st.button("Forgot Password?"):
+        st.session_state["auth_page"] = "Forgot Password"
+        st.rerun()
+        
+# -- Forget Password --
+def forgot_password_page():
+    st.title("Reset Your Password")
+
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        st.subheader("Forgot Password")
+
+        with st.form("reset_form"):
+            username = st.text_input("Username")
+            new_password = st.text_input("New Password", type="password")
+            confirm_password = st.text_input("Confirm New Password", type="password")
+            submit = st.form_submit_button("Reset Password")
+
+            if submit:
+                user = get_user_by_username(username)
+                if not user:
+                    st.error("No account found with this username.")
+                elif new_password != confirm_password:
+                    st.error("Passwords do not match.")
+                else:
+                    hashed_pw = hash_password(new_password)
+                    if update_user_password(username, hashed_pw):
+                        st.success("Password updated successfully! Please log in.")
+                        st.session_state["auth_page"] = "Login"
+                        st.rerun()
+                    else:
+                        st.error("Failed to update password. Please try again.")
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Sign Up Page ---
@@ -66,9 +102,6 @@ def signup_page():
                 else:
                     hashed_password = hash_password(new_password)
                     user_id = insert_user(new_name, new_username, new_email, hashed_password)
-                    st.success("Sign-up successful! Please log in.")
-                    st.session_state["auth_page"] = "Login"
-                    st.session_state["user_id"] = user_id
-                    st.session_state["name"] = new_name
-                    st.rerun()
+                    st.success("Account created successfully! Please select 'Login' from the sidebar to log in.")
+                    # No redirect; user stays on signup page
         st.markdown('</div>', unsafe_allow_html=True)
