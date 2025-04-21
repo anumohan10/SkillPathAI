@@ -18,8 +18,11 @@ def render_profile_page():
         st.markdown('<div class="container-card">', unsafe_allow_html=True)
         col1, col2 = st.columns([1, 3])
         with col1:
-            img_path = os.path.join(os.path.dirname(__file__), "..", "assets", "user_profile.png")
-            st.image(img_path, width=180)
+            img_path = "/Users/anusreemohanan/Documents/GitHub/SkillPathAI/frontend/assets/user_profile.png"
+            if os.path.exists(img_path):
+                st.image(img_path, width=180)
+            else:
+                st.warning("Profile image not found.")
         with col2:
             st.write(f"### {user_details['name']}")
             st.write(f"**Username:** {user_details['username']}")
