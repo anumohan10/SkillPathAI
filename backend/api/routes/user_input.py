@@ -45,9 +45,9 @@ class LearningPathRequest(BaseModel):
     learning_style: Optional[str] = None
     time_commitment: Optional[str] = None
 
-class ChatHistoryData(BaseModel):
+class SessionStateData(BaseModel):
     user_name: str
-    chat_history: list
+    session_state: str
     timestamp: Optional[str] = None
 
 class LearningPathData(BaseModel):
@@ -215,21 +215,21 @@ def generate_learning_path(request: LearningPathRequest):
             detail=f"Error generating learning path: {str(e)}"
         )
 
-@router.post("/chat-history")
-def save_chat_history(data: ChatHistoryData):
+@router.post("/save-session-state")
+def save_session_state(data: SessionStateData):
     """
-    Save user chat history
+    Save user session state
     """
     try:
-        from backend.database import save_chat_history
+        from backend.database import save_session_state
         
-        # Convert chat_history to JSON string if it's not already
-        chat_history_str = json.dumps(data.chat_history) if isinstance(data.chat_history, list) else data.chat_history
+        # Convert session_state to JSON string if it's not already
+        session_state_str = json.dumps(data.session_state) if isinstance(data.session_state, list) else data.session_state
         
         # Save to database
-        flag, message = save_chat_history(
+        flag, message = save_session_state(
             user_name=data.user_name,
-            chat_history=chat_history_str,
+            session_state=session_state_str,
             cur_timestamp=data.timestamp
         )
         if flag:

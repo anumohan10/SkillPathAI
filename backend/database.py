@@ -53,8 +53,8 @@ def create_resumes_table():
             cur.close()
             conn.close()
 
-def save_chat_history(user_name, chat_history, cur_timestamp):
-    """Save chat history to Snowflake."""
+def save_session_state(user_name, session_state, cur_timestamp):
+    """Save session state to Snowflake."""
     conn = get_snowflake_connection()
     if conn:
         try:
@@ -71,7 +71,7 @@ def save_chat_history(user_name, chat_history, cur_timestamp):
             INSERT INTO chat_history (user_name, chat_history, cur_timestamp)
             VALUES (%s, %s, %s);
             """
-            cur.execute(insert_query, (user_name, json.dumps(chat_history), cur_timestamp))
+            cur.execute(insert_query, (user_name, session_state, cur_timestamp))
             conn.commit()
             logger.info("✅ Chat history saved to Snowflake.")
             return True, "Chat history saved successfully"

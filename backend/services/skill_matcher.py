@@ -76,7 +76,7 @@ def get_job_requirements(role: str) -> Dict[str, List[str]]:
             f"Don't include any explanation, just return the JSON."
         )
         
-        response = chat_service.get_llm_response(prompt)
+        flag, response = chat_service.get_llm_response(prompt)
         
         # Try to parse JSON response
         try:
