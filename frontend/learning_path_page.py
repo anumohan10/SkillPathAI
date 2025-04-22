@@ -30,16 +30,30 @@ logger = logging.getLogger(__name__) # Use __name__ for logger
 now = datetime.now()
 
 
-def render_learning_path_page(): # Renamed function
+def render_learning_path_page():
     """Main function for the Learning Path chat feature with proper error handling."""
 
-    # --- Log state at the beginning of each execution --- 
+    # --- Log state ---
     logger.info(f"--- Entering render_learning_path_page ---")
     logger.info(f"Current lp_state: {st.session_state.get('lp_state', 'Not Set')}")
     logger.info(f"Current page: {st.session_state.get('current_page', 'Not Set')}")
     logger.info(f"LP Messages count: {len(st.session_state.get('lp_messages', []))}")
     logger.info(f"LP Data keys: {list(st.session_state.get('lp_data', {}).keys())}")
-    # --- End Logging --- 
+
+    if st.session_state.get("chat_resumed", False):
+        st.success("🔁 Resumed previous chat.")
+        del st.session_state.chat_resumed
+
+    # Convert JSON string to list of dicts if needed
+    if "lp_messages" in st.session_state and isinstance(st.session_state.lp_messages, str):
+        try:
+            st.session_state.lp_messages = json.loads(st.session_state.lp_messages)
+            logger.info("Deserialized lp_messages from JSON string.")
+        except json.JSONDecodeError as e:
+            st.error("Failed to load previous chat history.")
+            logger.error(f"JSON parsing error in lp_messages: {e}")
+            st.session_state.lp_messages = []
+        
     # Add Back button
     if st.button("⬅️ Back to Guidance Hub"):
         st.session_state.current_page = "Guidance Hub"
@@ -48,7 +62,8 @@ def render_learning_path_page(): # Renamed function
             save_chat_history(
                 user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.lp_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                cur_timestamp=st.session_state.cur_timestamp,
+                source_page="learning_path"
             )
             logger.info("Saved chat history on navigation back (results were displayed)")
         else:
@@ -340,7 +355,8 @@ def render_learning_path_page(): # Renamed function
                     save_chat_history(
                         user_name=st.session_state.get("username", "User"),
                         chat_history=json.dumps(st.session_state.lp_messages),
-                        cur_timestamp=st.session_state.cur_timestamp
+                        cur_timestamp=st.session_state.cur_timestamp,
+                        source_page="learning_path"
                     )
                     logger.info("Saved chat history on restart via chat (results were displayed)")
                 # Reset session state
@@ -399,7 +415,8 @@ def render_learning_path_page(): # Renamed function
             save_chat_history(
                 user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.lp_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                cur_timestamp=st.session_state.cur_timestamp,
+                source_page="learning_path"
             )
             logger.info("Saved chat history on sidebar restart (results were displayed)")
         # Reset chat state
@@ -411,22 +428,33 @@ def render_learning_path_page(): # Renamed function
             del st.session_state.results_displayed
         st.rerun()
         
-    if st.sidebar.button("⏹️ End Chat"):
-        logger.info("User clicked End Chat from sidebar button.")
-        st.session_state.current_page = "Dashboard"
-        # Save chat history
-        if st.session_state.get('results_displayed', False):
+    # --- Sidebar: End Chat ---
+st.sidebar.divider()
+if st.sidebar.button("⏹️ End Chat"):
+    logger.info("User clicked End Chat from sidebar button.")
+    
+    # Safely get the current timestamp if it exists, fallback if not
+    cur_time = st.session_state.get("cur_timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+    # Save chat history only if results were shown
+    if st.session_state.get('results_displayed', False):
+        try:
             save_chat_history(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.lp_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                chat_history=json.dumps(st.session_state.get("lp_messages", [])),
+                cur_timestamp=cur_time,
+                source_page="learning_path"
             )
             logger.info("Saved chat history on end chat (results were displayed)")
-        # Clear specific states for this page
-        if 'lp_state' in st.session_state: del st.session_state.lp_state
-        if 'lp_messages' in st.session_state: del st.session_state.lp_messages
-        if 'lp_data' in st.session_state: del st.session_state.lp_data
-        if 'results_displayed' in st.session_state: del st.session_state.results_displayed
-        if 'cur_timestamp' in st.session_state: del st.session_state.cur_timestamp
-        logger.info("Navigating to Dashboard, resetting LP state.")
-        st.rerun() 
+        except Exception as e:
+            logger.error(f"Error saving chat history: {e}", exc_info=True)
+
+    # Clear session state keys related to Learning Path
+    for key in ['lp_state', 'lp_messages', 'lp_data', 'results_displayed', 'cur_timestamp']:
+        if key in st.session_state:
+            del st.session_state[key]
+
+    # Redirect user to Dashboard
+    st.session_state.current_page = "Dashboard"
+    logger.info("Navigated to Dashboard. LP state reset.")
+    st.rerun()

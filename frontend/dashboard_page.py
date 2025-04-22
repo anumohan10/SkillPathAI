@@ -1,45 +1,64 @@
 # frontend/pages/dashboard_page.py
+
 import streamlit as st
+import json
+from datetime import datetime
+from backend.database import get_snowflake_connection
+
+def fetch_recent_chats(user_name, limit=5):
+    conn = get_snowflake_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT chat_history, cur_timestamp, source_page
+                FROM chat_history
+                WHERE user_name = %s
+                ORDER BY cur_timestamp DESC
+                LIMIT %s
+            """, (user_name, limit))
+            return cur.fetchall()
+        finally:
+            cur.close()
+            conn.close()
+    return []
 
 def render_dashboard_page():
     st.header("Dashboard")
     st.write(f"Welcome, {st.session_state.get('username', 'Guest')}!")
 
-    # User stats in a card
+    # --- Chat History Section Only ---
     with st.container():
-        st.markdown('<div class="container-card">', unsafe_allow_html=True)
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            # Replace with dynamic data later
-            st.metric("Skills Identified", "12")
-        with col2:
-            # Replace with dynamic data later
-            st.metric("Learning Progress", "65%")
-        with col3:
-            # Replace with dynamic data later
-            st.metric("Career Matches", "8")
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="container-card" style="margin-top: 20px;">', unsafe_allow_html=True)
+        st.subheader("🕓 Recent Chat History")
 
-    # Progress charts in a card
-    with st.container():
-        st.markdown('<div class="container-card" style="margin-top: 20px;">', unsafe_allow_html=True) # Added margin
-        st.subheader("Your Learning Progress (Placeholder)")
-        # Replace with actual chart data later
-        data = {
-            "Python Basics": 100,
-            "Data Analysis": 80,
-            "Machine Learning": 60,
-            "Web Development": 40,
-            "Cloud Services": 20
-        }
-        st.bar_chart(data)
-        st.markdown('</div>', unsafe_allow_html=True)
+        username = st.session_state.get("username", "User")
+        recent_chats = fetch_recent_chats(username)
 
-    # Recent activity in a card
-    with st.container():
-        st.markdown('<div class="container-card" style="margin-top: 20px;">', unsafe_allow_html=True) # Added margin
-        st.subheader("Recent Activity (Placeholder)")
-        # Replace with dynamic activity later
-        st.info("Completed Python Basics course")
-        st.info("Added new skills to your profile")
-        st.markdown('</div>', unsafe_allow_html=True) 
+        if not recent_chats:
+            st.info("No chat history found.")
+        else:
+            for i, (chat_json, timestamp, source) in enumerate(recent_chats):
+                try:
+                    chat_list = json.loads(chat_json)
+                    preview = chat_list[-1]["content"][:80] + "..." if chat_list else "(empty)"
+                except:
+                    preview = "(could not load preview)"
+
+                label = f"🗨️ {source.replace('_', ' ').title()} Chat – {timestamp.strftime('%b %d, %Y %I:%M %p')}"
+                if st.button(label, key=f"chat_{i}"):
+                    if source == "career_transition":
+                        st.session_state.ct_messages = chat_list
+                        st.session_state.ct_state = "display_results"
+                        st.session_state.current_page = "Career Transition"
+                    elif source == "learning_path":
+                        st.session_state.lp_messages = chat_list
+                        st.session_state.lp_state = "display_results"
+                        st.session_state.current_page = "Learning Path"
+                    st.session_state.results_displayed = True
+                    st.session_state.chat_resumed = True
+                    st.rerun()
+
+                st.caption(preview)
+
+        st.markdown('</div>', unsafe_allow_html=True)

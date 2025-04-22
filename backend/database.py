@@ -53,7 +53,7 @@ def create_resumes_table():
             cur.close()
             conn.close()
 
-def save_chat_history(user_name, chat_history, cur_timestamp):
+def save_chat_history(user_name, chat_history, cur_timestamp, source_page):
     """Save chat history to Snowflake."""
     conn = get_snowflake_connection()
     if conn:
@@ -63,19 +63,20 @@ def save_chat_history(user_name, chat_history, cur_timestamp):
             CREATE TABLE IF NOT EXISTS chat_history (
                 user_name VARCHAR(255),
                 chat_history VARCHAR,
-                cur_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+                cur_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+                source_page VARCHAR(50)
             );
             """
             cur.execute(create_table_query)
             insert_query = """
-            INSERT INTO chat_history (user_name, chat_history, cur_timestamp)
-            VALUES (%s, %s, %s);
+            INSERT INTO chat_history (user_name, chat_history, cur_timestamp, source_page)
+            VALUES (%s, %s, %s, %s);
             """
-            cur.execute(insert_query, (user_name, json.dumps(chat_history), cur_timestamp))
+            cur.execute(insert_query, (user_name, json.dumps(chat_history), cur_timestamp, source_page))
             conn.commit()
-            logger.info("✅ Chat history saved to Snowflake.")
+            logger.info("Chat history saved to Snowflake.")
         except Exception as e:
-            logger.error(f"❌ Error saving chat history: {e}")
+            logger.error(f"Error saving chat history: {e}")
         finally:
             cur.close()
             conn.close()

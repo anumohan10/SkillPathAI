@@ -37,6 +37,11 @@ now = datetime.now()
 def render_career_transition_page(): # Renamed function
     """Main function for the Career Transition feature with resume analysis."""
 
+# Show message if chat resumed from dashboard
+    if st.session_state.get("chat_resumed", False):
+        st.success("🔁 Resumed previous chat.")
+        del st.session_state.chat_resumed
+
     # --- Log state at the beginning of each execution ---
     logger.info(f"--- Entering render_career_transition_page ---")
     logger.info(f"Current ct_state: {st.session_state.get('ct_state', 'Not Set')}")
@@ -44,7 +49,14 @@ def render_career_transition_page(): # Renamed function
     logger.info(f"CT Messages count: {len(st.session_state.get('ct_messages', []))}")
     logger.info(f"CT Data keys: {list(st.session_state.get('ct_data', {}).keys())}")
     # --- End Logging ---
-
+    # Deserialize chat history if stored as a string
+    if "ct_messages" in st.session_state and isinstance(st.session_state.ct_messages, str):
+        try:
+            st.session_state.ct_messages = json.loads(st.session_state.ct_messages)
+            logger.info("Deserialized ct_messages from JSON string.")
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parsing ct_messages JSON: {e}")
+            st.session_state.ct_messages = []
     # Add Back button
     if st.button("⬅️ Back to Guidance Hub"):
         st.session_state.current_page = "Guidance Hub"
@@ -53,7 +65,8 @@ def render_career_transition_page(): # Renamed function
             save_chat_history(
                 user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.ct_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                cur_timestamp = st.session_state.get("cur_timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                source_page="career_transition"
             )
             logger.info("Saved chat history on navigation back (results were displayed)")
         else:
@@ -367,7 +380,8 @@ def render_career_transition_page(): # Renamed function
                     save_chat_history(
                         user_name=st.session_state.get("username", "User"),
                         chat_history=json.dumps(st.session_state.ct_messages),
-                        cur_timestamp=st.session_state.cur_timestamp
+                        cur_timestamp = st.session_state.get("cur_timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                        source_page="career_transition"
                     )
                     logger.info("Saved chat history on restart via chat (results were displayed)")
                 # Reset session state
@@ -417,25 +431,6 @@ def render_career_transition_page(): # Renamed function
 
     # --- Sidebar Actions ---
     st.sidebar.divider()
-    st.sidebar.header("Chat Controls")
-    if st.sidebar.button("🔄 Restart Analysis"):
-        logger.info("User initiated career transition reset from sidebar button.")
-        # Save chat history before resetting
-        if len(st.session_state.get("ct_messages", [])) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history(
-                user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.ct_messages),
-                cur_timestamp=st.session_state.cur_timestamp
-            )
-            logger.info("Saved chat history on sidebar restart (results were displayed)")
-        # Reset chat state
-        st.session_state.ct_state = "ask_name"
-        st.session_state.ct_messages = []
-        st.session_state.ct_data = {}
-        st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
-        if "results_displayed" in st.session_state:
-            del st.session_state.results_displayed
-        st.rerun()
 
     if st.sidebar.button("⏹️ End Chat"):
         logger.info("User clicked End Chat from sidebar button.")
@@ -445,7 +440,8 @@ def render_career_transition_page(): # Renamed function
             save_chat_history(
                 user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.ct_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                cur_timestamp = st.session_state.get("cur_timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                source_page="career_transition"
             )
             logger.info("Saved chat history on end chat (results were displayed)")
         # Clear specific states for this page
