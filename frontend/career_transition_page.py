@@ -28,27 +28,49 @@ now = datetime.now()
 # Define API URL - should be configurable in production
 API_URL = "http://localhost:8000"
 
-def save_chat_history_api(user_name, chat_history, cur_timestamp):
-    """Save chat history via API instead of direct function call."""
+# Custom JSON encoder to handle non-serializable objects
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, pd.DataFrame):
+            return obj.to_dict('records')
+        elif isinstance(obj, pd.Series):
+            return obj.to_dict()
+        elif isinstance(obj, (pd.Timestamp, datetime)):
+            return obj.isoformat()
+        elif hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        return str(obj)
+
+def save_session_state_api(user_name, session_state_data, cur_timestamp, source_page, role):
+    """Save entire session state data via API instead of direct function call."""
     try:
-        # Call the API endpoint to save chat history
+        logger.info(f"Type of session state data: {type(session_state_data)}")
+        
+        # Convert to JSON string for API using the custom encoder
+        session_state_json = json.dumps(session_state_data, cls=CustomJSONEncoder)
+        
+        # Call the API endpoint to save session state data
+        logger.info(f"Session state data: {session_state_json[:100]}...")  # Log only first 100 chars
+        
         response = requests.post(
-            f"{API_URL}/user-input/chat-history",
+            f"{API_URL}/user-input/save-session-state",
             json={
                 "user_name": user_name,
-                "chat_history": chat_history,
-                "timestamp": cur_timestamp
+                "session_state": session_state_json,  # Send as JSON string
+                "timestamp": cur_timestamp,
+                "source_page": source_page,
+                "role": role
             }
         )
         
         if response.status_code == 200:
-            logger.info("Chat history saved successfully via API")
+            logger.info("Session state data saved successfully via API")
             return True
         else:
-            logger.error(f"API error saving chat history: {response.status_code}")
+            logger.error(f"API error saving session state data: {response.status_code}")
             return False
     except Exception as e:
-        logger.error(f"Error calling chat history API: {str(e)}")
+        logger.error(f"Error calling session state API: {str(e)}")
         return False
 
 def extract_resume_text_api(file):
@@ -289,10 +311,12 @@ def render_career_transition_page(): # Renamed function
         st.session_state.current_page = "Guidance Hub"
         # Save chat history before clearing
         if 'ct_messages' in st.session_state and len(st.session_state.ct_messages) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history_api(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.ct_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                session_state_data=st.session_state.to_dict(),
+                cur_timestamp=st.session_state.cur_timestamp,
+                source_page="career_transition",
+                role=st.session_state.ct_data.get("target_role", "Unknown Role")
             )
             logger.info("Saved chat history on navigation back (results were displayed)")
         else:
@@ -629,10 +653,12 @@ def render_career_transition_page(): # Renamed function
                 add_message("assistant", "Let's start fresh with a new career transition analysis!")
                 # Save chat history before resetting
                 if st.session_state.get('results_displayed', False):
-                    save_chat_history_api(
+                    save_session_state_api(
                         user_name=st.session_state.get("username", "User"),
-                        chat_history=json.dumps(st.session_state.ct_messages),
-                        cur_timestamp=st.session_state.cur_timestamp
+                        session_state_data=st.session_state.to_dict(),
+                        cur_timestamp=st.session_state.cur_timestamp,
+                        source_page="career_transition",
+                        role=st.session_state.ct_data.get("target_role", "Unknown Role")
                     )
                     logger.info("Saved chat history on restart via chat (results were displayed)")
                 # Reset session state
@@ -687,10 +713,12 @@ def render_career_transition_page(): # Renamed function
         logger.info("User initiated career transition reset from sidebar button.")
         # Save chat history before resetting
         if len(st.session_state.get("ct_messages", [])) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history_api(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.ct_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                session_state_data=st.session_state.to_dict(),
+                cur_timestamp=st.session_state.cur_timestamp,
+                source_page="career_transition",
+                role=st.session_state.ct_data.get("target_role", "Unknown Role")
             )
             logger.info("Saved chat history on sidebar restart (results were displayed)")
         # Reset chat state
@@ -707,10 +735,12 @@ def render_career_transition_page(): # Renamed function
         st.session_state.current_page = "Dashboard"
         # Save chat history
         if st.session_state.get('results_displayed', False):
-            save_chat_history_api(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.ct_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                session_state_data=st.session_state.to_dict(),
+                cur_timestamp=st.session_state.cur_timestamp,
+                source_page="career_transition",
+                role=st.session_state.ct_data.get("target_role", "Unknown Role")
             )
             logger.info("Saved chat history on end chat (results were displayed)")
         # Clear specific states for this page

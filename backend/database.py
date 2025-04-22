@@ -123,39 +123,26 @@ def create_resumes_table():
             cur.close()
             conn.close()
 
-def save_chat_history(user_name, chat_history, cur_timestamp, source_page="Unknown", target_role=None):
-    """Save chat history to Snowflake."""
+def save_session_state(user_name, session_state, cur_timestamp, source_page, role):
+    """Save session state to Snowflake."""
     conn = get_snowflake_connection()
     if conn:
         try:
             cur = conn.cursor()
-            # Use the fully qualified table name and include all required columns
+            # create_table_query = """
+            # CREATE TABLE IF NOT EXISTS chat_history (
+            #     user_name VARCHAR(255),
+            #     chat_history VARCHAR,
+            #     cur_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+            #     source_page VARCHAR(50)
+            # );
+            # """
+            # cur.execute(create_table_query)
             insert_query = """
-            INSERT INTO SKILLPATH_DB.RAW_DATA.CHAT_HISTORY (user_name, chat_history, cur_timestamp, source_page, role)
+            INSERT INTO chat_history (user_name, chat_history, cur_timestamp, source_page, role)
             VALUES (%s, %s, %s, %s, %s);
             """
-            
-            # Convert chat history to a string in the appropriate format
-            # Check if it's a dict or list (needs to be serialized)
-            if isinstance(chat_history, (list, dict)):
-                chat_history_str = json.dumps(chat_history)
-            # Check if it's already a string that contains JSON
-            elif isinstance(chat_history, str):
-                try:
-                    # Attempt to parse and re-serialize to ensure valid JSON format
-                    json_obj = json.loads(chat_history)
-                    chat_history_str = json.dumps(json_obj)
-                except json.JSONDecodeError:
-                    # Not valid JSON, use as-is (unlikely but handled)
-                    chat_history_str = chat_history
-            else:
-                # Fallback case (unlikely)
-                chat_history_str = str(chat_history)
-                
-            # Use target_role as-is, or "Unknown Role" if None
-            role_value = target_role if target_role else "Unknown Role"
-                
-            cur.execute(insert_query, (user_name, chat_history_str, cur_timestamp, source_page, role_value))
+            cur.execute(insert_query, (user_name, session_state, cur_timestamp, source_page, role))
             conn.commit()
             logger.info(f"✅ Chat history saved to SKILLPATH_DB.RAW_DATA.CHAT_HISTORY for user {user_name} with role {role_value}")
             return True, "Chat history saved successfully"
@@ -165,3 +152,25 @@ def save_chat_history(user_name, chat_history, cur_timestamp, source_page="Unkno
         finally:
             cur.close()
             conn.close()
+            
+def retrieve_session_state(user_name, limit):
+    try:
+        conn = get_snowflake_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT chat_history, cur_timestamp, source_page, role
+            FROM chat_history
+            WHERE user_name = %s
+            ORDER BY cur_timestamp DESC
+            LIMIT %s
+        """, (user_name, limit))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.warning(f"Database error while retrieving session data: {e}") 
+        
+def clean_up_session(cur):
+    pass
+    
