@@ -53,7 +53,9 @@ def render_career_transition_page(): # Renamed function
             save_chat_history(
                 user_name=st.session_state.get("username", "User"),
                 chat_history=json.dumps(st.session_state.ct_messages),
-                cur_timestamp=st.session_state.cur_timestamp
+                cur_timestamp=st.session_state.cur_timestamp,
+                source_page="learning_path",
+                role=st.session_state.lp_data.get("target_role", "Unknown Role")
             )
             logger.info("Saved chat history on navigation back (results were displayed)")
         else:
