@@ -9,3 +9,6 @@ backend/services/__pycache__
 **/*.log
 frontend/pages/__pycache__/learning_path.cpython-312.pyc
 .cursor/
+backend/__pycache__
+backend/__pycache__/database.cpython-39.pyc
+backend/__pycache__/database.cpython-312.pyc

@@ -18,169 +18,287 @@ def format_course_message(courses_df, target_role):
         str: A markdown-formatted message for display in the UI
         bool: Whether valid courses were found
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    # Debug logging to see what we're working with
+    logger.info(f"Formatting courses: DataFrame has {len(courses_df)} rows")
+    logger.info(f"DataFrame columns: {list(courses_df.columns)}")
+    
     if courses_df.empty:
         return f"I couldn't find specific courses for {target_role} at this time. Please check with your administrator about updating the course database.", False
     
-    course_msg = f"# Data Engineer Learning Path\n\n"
+    course_msg = f"# 📋 Learning Path\n\n"
     levels = ["BEGINNER", "INTERMEDIATE", "ADVANCED"]
     has_valid_courses = False
     
-    for level in levels:
-        level_courses = courses_df[courses_df["LEVEL_CATEGORY"] == level]
-        
-        if not level_courses.empty:
-            level_title_added = False
-            
-            for _, course in level_courses.iterrows():
-                # Check if this course has valid data (not None)
-                if (course['COURSE_NAME'] and 
-                    str(course['COURSE_NAME']).lower() != 'none' and
-                    course['URL'] and 
-                    str(course['URL']).lower() != 'none'):
-                    
-                    if not level_title_added:
-                        if level == "BEGINNER":
-                            course_msg += f"# 📚 {level.title()} Level (Month 1-2)\n\n"
-                        elif level == "INTERMEDIATE":
-                            course_msg += f"# 🔄 {level.title()} Level (Month 3-4)\n\n"
-                        elif level == "ADVANCED":
-                            course_msg += f"# 🔥 {level.title()} Level (Month 5-6)\n\n"
-                        else:
-                            course_msg += f"# {level.title()} Level\n\n"
-                        level_title_added = True
-                    
-                    course_msg += f"### {course['COURSE_NAME']}\n\n"
-                    
-                    # Format platform and level more prominently using markdown
-                    platform_text = ""
-                    # Add platform if available
-                    if 'PLATFORM' in course and course['PLATFORM'] and str(course['PLATFORM']).lower() != 'none':
-                        platform_text = f"**🏢 Platform**: {course['PLATFORM']}"
-                    
-                    # Add level information
-                    if course['LEVEL'] and str(course['LEVEL']).lower() != 'none':
-                        if platform_text:
-                            platform_text += f" | **📊 Level**: {course['LEVEL']}"
-                        else:
-                            platform_text = f"**📊 Level**: {course['LEVEL']}"
-                    
-                    # Add the platform/level info using markdown formatting
-                    course_msg += f"> {platform_text}\n\n"
-                    
-                    # Add description with better formatting using bullet points for long descriptions
-                    if course['DESCRIPTION'] and str(course['DESCRIPTION']).lower() != 'none':
-                        desc = course['DESCRIPTION']
-                        # Format longer descriptions into a more readable format
-                        if len(desc) > 300:
-                            # Split into paragraphs for better reading
-                            paragraphs = []
-                            current_para = ""
-                            words = desc.split()
-                            for word in words:
-                                if len(current_para) + len(word) < 80:  # Line length
-                                    current_para += " " + word if current_para else word
-                                else:
-                                    paragraphs.append(current_para)
-                                    current_para = word
-                            if current_para:
-                                paragraphs.append(current_para)
-                                
-                            # Create a nicely formatted description
-                            course_msg += f"**What you'll learn**:\n\n"
-                            for para in paragraphs:
-                                course_msg += f"- {para}\n"
-                            course_msg += "\n"
-                        else:
-                            course_msg += f"**What you'll learn**: {desc}\n\n"
-                    
-                    # Format skills as a bullet list for better readability
-                    if course['SKILLS'] and str(course['SKILLS']).lower() != 'none':
-                        skills = course['SKILLS'].split(', ')
-                        course_msg += f"**Key skills**:\n\n"
-                        # Organize into 2-3 skills per line for a cleaner look
-                        skill_groups = []
-                        current_group = []
-                        for skill in skills:
-                            if len(', '.join(current_group + [skill])) < 80:  # Keep lines reasonable length
-                                current_group.append(skill)
-                            else:
-                                skill_groups.append(current_group)
-                                current_group = [skill]
-                        if current_group:
-                            skill_groups.append(current_group)
-                        
-                        # Add skill groups as bullet points
-                        for group in skill_groups:
-                            course_msg += f"- {', '.join(group)}\n"
-                        course_msg += "\n"
-                    
-                    # Add URL with better styling using markdown
-                    if course['URL'] and str(course['URL']).lower() != 'none':
-                        course_msg += f"**[➡️ Enroll in this course]({course['URL']})**\n\n"
-                    
-                    # Add separator between courses
-                    course_msg += "---\n\n"
-                    has_valid_courses = True
+    # Normalize column names to handle case sensitivity issues
+    # Create a mapping of lowercase column names to actual column names
+    column_map = {col.lower(): col for col in courses_df.columns}
     
+    # Handle common column name variations
+    level_category_col = column_map.get('level_category', column_map.get('levelcategory', 'LEVEL_CATEGORY'))
+    course_name_col = column_map.get('course_name', column_map.get('coursename', 'COURSE_NAME'))
+    url_col = column_map.get('url', 'URL')
+    platform_col = column_map.get('platform', 'PLATFORM')
+    level_col = column_map.get('level', 'LEVEL')
+    description_col = column_map.get('description', 'DESCRIPTION')
+    skills_col = column_map.get('skills', 'SKILLS')
+    
+    # Log what column names we're using
+    logger.info(f"Using columns: level_category={level_category_col}, course_name={course_name_col}, url={url_col}")
+    
+    # Check if critical columns are present
+    if level_category_col not in courses_df.columns:
+        logger.warning(f"LEVEL_CATEGORY column not found in DataFrame! Available columns: {list(courses_df.columns)}")
+        # If level_category is missing, assign all courses to BEGINNER level
+        courses_df['LEVEL_CATEGORY'] = 'BEGINNER'
+        level_category_col = 'LEVEL_CATEGORY'
+    
+    if course_name_col not in courses_df.columns or url_col not in courses_df.columns:
+        logger.warning(f"Critical columns missing! course_name or URL not found")
+        return f"I retrieved courses but couldn't properly format them due to missing data. Please try again later.", False
+    
+    # Process each level
+    for level in levels:
+        try:
+            level_courses = courses_df[courses_df[level_category_col] == level]
+            
+            if not level_courses.empty:
+                logger.info(f"Found {len(level_courses)} courses for level {level}")
+                level_title_added = False
+                
+                for _, course in level_courses.iterrows():
+                    # Check if this course has valid data (not None)
+                    course_name = str(course.get(course_name_col, ""))
+                    course_url = str(course.get(url_col, ""))
+                    
+                    if (course_name and course_name.lower() != 'none' and 
+                        course_url and course_url.lower() != 'none'):
+                        
+                        if not level_title_added:
+                            if level == "BEGINNER":
+                                course_msg += f"# 📚 {level.title()} Level (Month 1-2)\n\n"
+                            elif level == "INTERMEDIATE":
+                                course_msg += f"# 🔄 {level.title()} Level (Month 3-4)\n\n"
+                            elif level == "ADVANCED":
+                                course_msg += f"# 🔥 {level.title()} Level (Month 5-6)\n\n"
+                            else:
+                                course_msg += f"# {level.title()} Level\n\n"
+                            level_title_added = True
+                        
+                        course_msg += f"### {course_name}\n\n"
+                        
+                        # Format platform and level more prominently using markdown
+                        platform_text = ""
+                        # Add platform if available
+                        platform = course.get(platform_col, "")
+                        if platform and str(platform).lower() != 'none':
+                            platform_text = f"**🏢 Platform**: {platform}"
+                        
+                        # Add level information
+                        course_level = course.get(level_col, "")
+                        if course_level and str(course_level).lower() != 'none':
+                            if platform_text:
+                                platform_text += f" | **📊 Level**: {course_level}"
+                            else:
+                                platform_text = f"**📊 Level**: {course_level}"
+                        
+                        # Add the platform/level info using markdown formatting
+                        if platform_text:
+                            course_msg += f"> {platform_text}\n\n"
+                        
+                        # Add description with better formatting
+                        description = course.get(description_col, "")
+                        if description and str(description).lower() != 'none':
+                            course_msg += f"**What you'll learn**:\n\n{description}\n\n"
+                        
+                        # Format skills as a bullet list for better readability
+                        skills = course.get(skills_col, "")
+                        if skills and str(skills).lower() != 'none':
+                            try:
+                                skill_list = skills.split(', ')
+                                course_msg += f"**Key skills**:\n\n"
+                                for skill in skill_list[:10]:  # Limit to 10 skills to avoid overwhelming
+                                    course_msg += f"- {skill}\n"
+                                course_msg += "\n"
+                            except Exception as e:
+                                logger.error(f"Error formatting skills: {e}")
+                        
+                        # Add URL with better styling using markdown
+                        course_msg += f"**[➡️ Enroll in this course]({course_url})**\n\n"
+                        
+                        # Add separator between courses
+                        course_msg += "---\n\n"
+                        has_valid_courses = True
+        except Exception as e:
+            logger.error(f"Error processing level {level}: {e}")
+            continue
+    
+    if not has_valid_courses:
+        # If we had courses but couldn't format them properly
+        if not courses_df.empty:
+            logger.warning("No valid courses could be formatted despite having data")
+            # Try a simplified approach as fallback
+            try:
+                course_msg += "# 📚 Course Recommendations\n\n"
+                for _, course in courses_df.iterrows():
+                    # Just try to show the bare minimum
+                    course_name = str(course.get(course_name_col, "Unknown Course"))
+                    course_url = course.get(url_col, "")
+                    
+                    course_msg += f"### {course_name}\n\n"
+                    if course_url:
+                        course_msg += f"**[➡️ Enroll in this course]({course_url})**\n\n"
+                    course_msg += "---\n\n"
+                
+                has_valid_courses = True
+            except Exception as e:
+                logger.error(f"Error in fallback course formatting: {e}")
+                course_msg = f"I'm having trouble formatting courses for {target_role}. Please try again later."
+                has_valid_courses = False
+    
+    logger.info(f"Finished formatting courses. Has valid courses: {has_valid_courses}")
     return course_msg, has_valid_courses
 
-def format_introduction(target_role, skill_ratings):
+def format_introduction(target_role, skill_ratings=None, missing_skills=None):
     """
-    Format the introduction for the learning path.
+    Format the introduction for the learning path or career transition.
+    Supports both skill ratings or missing skills.
     
     Args:
         target_role (str): The target role for the learning path
-        skill_ratings (dict): Dictionary of skill ratings
+        skill_ratings (dict, optional): Dictionary of skill ratings (for learning path)
+        missing_skills (list, optional): List of missing skills (for career transition)
         
     Returns:
         str: A markdown-formatted introduction
     """
-    intro_text = f"""
+    if skill_ratings:
+        # Standard learning path introduction based on skill assessments
+        intro_text = f"""
 # 🚀 Your Personalized Learning Path
 
 Based on your current skill assessment, I've curated courses that will help you advance your career as a **{target_role}**. These recommendations focus on strengthening your skills in:
 
 """
-    # Add skills that need improvement with emoji indicators
-    for skill, rating in skill_ratings.items():
-        if rating <= 2:
-            intro_text += f"- **{skill}** ⭐ (Prioritize)\n"
-        elif rating <= 3:
-            intro_text += f"- **{skill}** ⭐⭐ (Focus area)\n"
-    
-    intro_text += """
-The learning path is organized from beginner to advanced courses, designed for completion within 6 months. Each course is chosen to address specific skill gaps and help you build a comprehensive foundation in data engineering.
+        # Add skills that need improvement with star ratings matching the actual rating
+        for skill, rating in skill_ratings.items():
+            if rating <= 3:  # Focus on skills that need improvement
+                # Add filled stars equal to the rating and empty stars to complete 5 stars
+                filled_stars = "★" * rating
+                empty_stars = "☆" * (5 - rating)
+                priority_text = "(Prioritize)" if rating <= 2 else "(Focus area)"
+                intro_text += f"- **{skill}** {filled_stars}{empty_stars} {priority_text}\n"
+        
+        intro_text += """
+The learning path is organized from beginner to advanced courses, designed for completion within 6 months. Each course is chosen to address specific skill gaps and help you build a comprehensive foundation in this field.
 
 ---
 
 """
+    
+    elif missing_skills:
+        # Career transition introduction based on missing skills
+        intro_text = f"""
+# 🚀 Your {target_role} Career Transition Path
+
+Based on the skills identified in your resume and the requirements for a **{target_role}** role, I've curated courses to help you bridge your skill gaps. These recommendations focus on developing these critical skills:
+
+"""
+        # Add missing skills with priority indicators
+        for i, skill in enumerate(missing_skills):
+            priority = "⭐⭐⭐" if i < 3 else "⭐⭐" if i < 5 else "⭐"
+            intro_text += f"- **{skill}** {priority}\n"
+            
+        intro_text += """
+The learning path is organized from beginner to advanced courses, designed for completion within 3-6 months. Each course is chosen to help you build the specific skills needed for your career transition.
+
+---
+
+"""
+    
+    else:
+        # Generic introduction if neither skill_ratings nor missing_skills provided
+        intro_text = f"""
+# 🚀 Your {target_role} Learning Path
+
+I've curated a selection of courses to help you develop the key skills needed for a successful career as a **{target_role}**. These recommendations cover the essential competencies for this role.
+
+The learning path is organized from beginner to advanced courses, designed for completion within 3-6 months.
+
+---
+
+"""
+    
     return intro_text
 
 
-def format_career_advice():
+def format_career_advice(target_role=None, skill_ratings=None):
     """
-    Format career advice for after completing the learning path.
+    Generate career advice using LLM for a learning path.
     
+    Args:
+        target_role (str, optional): The target role for the learning path
+        skill_ratings (dict, optional): Dictionary of skill ratings
+        
     Returns:
         str: A markdown-formatted career advice message
-        
-    TODO: Refactor this function to remove hardcoded career advice.
-    This should be moved to a configuration file or database to make it:
-    1. Role-specific (currently only shows data engineering advice)
-    2. Easier to update without code changes
-    3. Potentially personalized based on user's skill assessment
     """
-    return """
+    try:
+        from backend.services.chat_service import ChatService
+        chat_service = ChatService()
+        
+        # Create a prompt to generate career advice
+        role_info = f"for a {target_role} role" if target_role else "for your chosen career path"
+        
+        # Include skill information if available
+        skill_info = ""
+        if skill_ratings:
+            # Get top skills and their ratings
+            skill_items = list(skill_ratings.items())
+            top_skills = [f"{skill} (rating: {rating}/5)" for skill, rating in skill_items[:5]]
+            skill_info = f"Your current top skills are: {', '.join(top_skills)}. "
+        
+        # Build the prompt
+        career_advice_prompt = (
+            f"You are a career advisor helping someone develop their skills {role_info}. "
+            f"{skill_info}"
+            f"Provide 4-5 concrete next steps they should take after completing their learning path. "
+            f"Include advice about building a portfolio, certifications, joining communities, and gaining practical experience. "
+            f"Format your response in Markdown with a title and bullet points. Keep it concise but specific."
+        )
+        
+        # Get advice from LLM
+        success, llm_career_advice = chat_service.get_llm_response(career_advice_prompt)
+        
+        # Use the LLM-generated advice if successful
+        if success and len(llm_career_advice) > 100:  # Ensure we got a substantial response
+            # Add a title if not present
+            if not llm_career_advice.strip().startswith("#"):
+                career_advice = f"# 💼 Next Steps After Completing Your Learning Path\n\n{llm_career_advice}"
+            else:
+                career_advice = llm_career_advice
+            return career_advice
+            
+        # Fallback for when LLM fails
+        return """
 # 💼 Next Steps After Completing Your Learning Path
 
-Once you've completed the courses in your learning path, consider these steps to advance your career:
+Sorry, we're having trouble generating personalized career advice at this moment. Please try again later.
+"""
+        
+    except Exception as e:
+        # Log the error
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error generating career advice with LLM: {e}")
+        
+        # Return error message
+        return """
+# 💼 Next Steps After Completing Your Learning Path
 
-1. **Build a portfolio** - Create 2-3 data engineering projects demonstrating your skills with cloud platforms, data pipelines, and big data technologies
-2. **Get certified** - Pursue relevant certifications like Google Cloud Professional Data Engineer or AWS Data Analytics Specialty
-3. **Join communities** - Connect with other data professionals on forums like Stack Overflow, Reddit's r/dataengineering, or Meetup groups
-4. **Contribute to open source** - Participate in data engineering open source projects to gain recognition
-
-Do you have any questions about your learning path or career next steps?
+Sorry, we're having trouble generating personalized career advice at this moment. Please try again later.
 """
 
 def format_skills_for_display(skill_ratings):
@@ -218,27 +336,10 @@ def format_transition_plan(username: str, current_skills: List[str], target_role
     Returns:
         dict: Dictionary with different sections of the formatted plan
     """
-    # Categorize current skills by relevance to target role
-    transferable_skills = []
-    strong_skills = []
-    
-    # Identify some key terms for the target role to categorize skills
-    role_keywords = []
-    if "data" in target_role.lower():
-        role_keywords = ["data", "sql", "analysis", "analytics", "visualization", "python", "statistics"]
-    elif "system" in target_role.lower() or "systems" in target_role.lower():
-        role_keywords = ["system", "architecture", "engineering", "integration", "design", "documentation"]
-    elif "software" in target_role.lower() or "developer" in target_role.lower():
-        role_keywords = ["software", "development", "code", "programming", "api", "testing"]
-    elif "engineer" in target_role.lower():
-        role_keywords = ["engineering", "technical", "design", "architecture", "development", "system"]
-    
-    # Categorize skills
-    for skill in current_skills:
-        if any(keyword in skill.lower() for keyword in role_keywords):
-            transferable_skills.append(skill)
-        else:
-            strong_skills.append(skill)
+    # Use simple division to categorize skills without hardcoded keywords
+    # Just split skills evenly between transferable and other strong skills
+    transferable_skills = current_skills[:len(current_skills)//2]
+    strong_skills = current_skills[len(current_skills)//2:]
     
     # Limit to top skills
     transferable_skills = transferable_skills[:8]
@@ -377,7 +478,35 @@ The courses below are organized into a structured learning path you can complete
                 # Add description
                 if course.get('DESCRIPTION'):
                     desc = course.get('DESCRIPTION')
-                    course_msg += f"**What you'll learn**: {desc}\n\n"
+                    # Format longer descriptions into a more readable format
+                    if len(desc) > 300:
+                        # Simple approach: Use complete description and break it into reasonable chunks
+                        words = desc.split()
+                        sentences = []
+                        current_sentence = []
+                        current_length = 0
+                        
+                        for word in words:
+                            # If adding this word doesn't make the line too long
+                            if current_length + len(word) + 1 <= 80:  # +1 for the space
+                                current_sentence.append(word)
+                                current_length += len(word) + 1
+                            else:
+                                # This line is full, start a new one
+                                if current_sentence:
+                                    sentences.append(" ".join(current_sentence))
+                                current_sentence = [word]
+                                current_length = len(word)
+                                
+                        # Add the last sentence if there is one
+                        if current_sentence:
+                            sentences.append(" ".join(current_sentence))
+                            
+                        # Create a paragraph-style description instead of bullet points
+                        course_msg += f"**What you'll learn**:\n\n"
+                        course_msg += f"{desc}\n\n"
+                    else:
+                        course_msg += f"**What you'll learn**:\n\n{desc}\n\n"
                 
                 # Format skills
                 if course.get('SKILLS'):
@@ -414,7 +543,35 @@ The courses below are organized into a structured learning path you can complete
                 # Add description
                 if course.get('DESCRIPTION'):
                     desc = course.get('DESCRIPTION')
-                    course_msg += f"**What you'll learn**: {desc}\n\n"
+                    # Format longer descriptions into a more readable format
+                    if len(desc) > 300:
+                        # Simple approach: Use complete description and break it into reasonable chunks
+                        words = desc.split()
+                        sentences = []
+                        current_sentence = []
+                        current_length = 0
+                        
+                        for word in words:
+                            # If adding this word doesn't make the line too long
+                            if current_length + len(word) + 1 <= 80:  # +1 for the space
+                                current_sentence.append(word)
+                                current_length += len(word) + 1
+                            else:
+                                # This line is full, start a new one
+                                if current_sentence:
+                                    sentences.append(" ".join(current_sentence))
+                                current_sentence = [word]
+                                current_length = len(word)
+                                
+                        # Add the last sentence if there is one
+                        if current_sentence:
+                            sentences.append(" ".join(current_sentence))
+                            
+                        # Create a paragraph-style description instead of bullet points
+                        course_msg += f"**What you'll learn**:\n\n"
+                        course_msg += f"{desc}\n\n"
+                    else:
+                        course_msg += f"**What you'll learn**:\n\n{desc}\n\n"
                 
                 # Format skills
                 if course.get('SKILLS'):
@@ -451,7 +608,35 @@ The courses below are organized into a structured learning path you can complete
                 # Add description
                 if course.get('DESCRIPTION'):
                     desc = course.get('DESCRIPTION')
-                    course_msg += f"**What you'll learn**: {desc}\n\n"
+                    # Format longer descriptions into a more readable format
+                    if len(desc) > 300:
+                        # Simple approach: Use complete description and break it into reasonable chunks
+                        words = desc.split()
+                        sentences = []
+                        current_sentence = []
+                        current_length = 0
+                        
+                        for word in words:
+                            # If adding this word doesn't make the line too long
+                            if current_length + len(word) + 1 <= 80:  # +1 for the space
+                                current_sentence.append(word)
+                                current_length += len(word) + 1
+                            else:
+                                # This line is full, start a new one
+                                if current_sentence:
+                                    sentences.append(" ".join(current_sentence))
+                                current_sentence = [word]
+                                current_length = len(word)
+                                
+                        # Add the last sentence if there is one
+                        if current_sentence:
+                            sentences.append(" ".join(current_sentence))
+                            
+                        # Create a paragraph-style description instead of bullet points
+                        course_msg += f"**What you'll learn**:\n\n"
+                        course_msg += f"{desc}\n\n"
+                    else:
+                        course_msg += f"**What you'll learn**:\n\n{desc}\n\n"
                 
                 # Format skills
                 if course.get('SKILLS'):

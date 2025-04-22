@@ -72,22 +72,94 @@ def process_missing_skills(extracted_skills: List[str], target_role: str) -> Lis
     try:
         chat_service = ChatService()
         
-        # Create a more targeted prompt with specific guidance
+        # First identify skills the user already has that are relevant to the target role
+        extracted_lower = [skill.lower() for skill in extracted_skills]
+        role_related_skills = []
+        
+        # Use a more dynamic approach to identify role-related skills
+        try:
+            # Connect to database to get role-specific keywords
+            from backend.database import get_snowflake_connection
+            conn = get_snowflake_connection()
+            cursor = conn.cursor()
+            
+            # Sanitize role name
+            safe_role = target_role.replace("'", "").replace('"', "")
+            
+            # Query Cortex for role-related keywords
+            query = f"""
+            SELECT PARSE_JSON(
+                SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+                    'SKILLPATH_SEARCH_POC',
+                    '{{
+                        "query": "What are 10 keywords that would identify skills related to a {safe_role} role? Return just a JSON array of single words.",
+                        "limit": 1
+                    }}'
+                )
+            )['results'][0]['content']::STRING as KEYWORDS;
+            """
+            
+            cursor.execute(query)
+            result = cursor.fetchone()
+            
+            if result and result[0]:
+                # Try to extract keywords
+                import json
+                import re
+                
+                # Try JSON parsing first
+                keywords = []
+                try:
+                    json_match = re.search(r'\[(.*?)\]', result[0], re.DOTALL)
+                    if json_match:
+                        keywords_json = f"[{json_match.group(1)}]"
+                        keywords = json.loads(keywords_json)
+                except:
+                    # If JSON parsing fails, try simple keyword extraction
+                    keywords = [w.strip().lower() for w in result[0].split(',')]
+                
+                # Use keywords to identify related skills
+                if keywords:
+                    for skill in extracted_skills:
+                        skill_lower = skill.lower()
+                        if any(keyword.lower() in skill_lower for keyword in keywords):
+                            role_related_skills.append(skill)
+            
+            cursor.close()
+            conn.close()
+            
+        except Exception as e:
+            # Fallback approach if the dynamic one fails
+            logger.warning(f"Dynamic keyword extraction failed: {str(e)}")
+            
+            # Simple fallback based on role name words
+            role_words = [word.lower() for word in target_role.split() if len(word) > 3]
+            
+            for skill in extracted_skills:
+                skill_lower = skill.lower()
+                # Check if any role word appears in the skill
+                if any(word in skill_lower for word in role_words):
+                    role_related_skills.append(skill)
+        
+        # Create a more targeted prompt with specific guidance - but now considering their existing related skills
         prompt = (
             f"You are a career counselor in 2025 specializing in {target_role} career transitions. "
             f"The candidate has the following skills from their resume: {', '.join(extracted_skills[:20])}. "
+            f"Of these skills, I've identified these as relevant to the {target_role} role: {', '.join(role_related_skills)}.\n\n"
             f"Given their current skills and the requirements of a {target_role} role in 2025:\n\n"
-            f"1. What are the 5-7 MOST CRUCIAL technical skills they're missing?\n"
+            f"1. Identify 4-6 CRUCIAL technical skills they're still missing (skills they DON'T already have)\n"
             f"2. Focus on specific technologies, tools, and methodologies rather than general abilities\n"
-            f"3. Prioritize skills that would have the highest impact in landing a {target_role} job\n\n"
-            f"Return ONLY a JSON array of specific skill names, with NO explanations or additional text."
+            f"3. Prioritize skills that would have the highest impact in landing a {target_role} job\n"
+            f"4. Do NOT include skills they already have (for example, if they know 'Machine Learning', don't list that)\n\n"
+            f"Return ONLY a JSON array of specific skill names they are missing, with NO explanations or additional text."
         )
         
         # Use a more comprehensive approach to get better results
-        response = chat_service.get_llm_response(prompt)
+        # ChatService.get_llm_response returns a tuple of (success_flag, response_text)
+        success, response = chat_service.get_llm_response(prompt)
         
-        # Check if response contains an error message
-        if "having trouble" in response or "sorry" in response.lower() or "I can't" in response:
+        # Check if the response was successful or contains an error message
+        if not success or "having trouble" in response or "sorry" in response.lower() or "I can't" in response:
             # Make a second attempt with a simpler, more direct prompt
             simple_prompt = (
                 f"List the top 5 most important technical skills needed for a {target_role} position in 2025 "
@@ -95,14 +167,16 @@ def process_missing_skills(extracted_skills: List[str], target_role: str) -> Lis
                 f"Return only a JSON array."
             )
             
-            response = chat_service.get_llm_response(simple_prompt)
+            success, response = chat_service.get_llm_response(simple_prompt)
             
             # If still getting errors, use role-specific defaults
-            if "having trouble" in response or "sorry" in response.lower() or "I can't" in response:
-                return get_default_skills_for_role(target_role)
+            if not success or "having trouble" in response or "sorry" in response.lower() or "I can't" in response:
+                return get_default_skills_for_role(target_role, extracted_skills)
         
         # Extract JSON list from response
         import re
+        import json  # Make sure json is imported here
+        
         json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
         
         if json_match:
@@ -110,66 +184,218 @@ def process_missing_skills(extracted_skills: List[str], target_role: str) -> Lis
                 skills_json = f"[{json_match.group(1)}]"
                 skills = json.loads(skills_json)
                 if skills and isinstance(skills, list) and len(skills) > 0:
-                    return skills
+                    # Verify that suggested skills are not already in extracted skills
+                    skills = [skill for skill in skills if not any(extracted.lower() == skill.lower() for extracted in extracted_skills)]
+                    return skills if skills else get_default_skills_for_role(target_role, extracted_skills)
                 else:
                     # Invalid or empty skills list
-                    return get_default_skills_for_role(target_role)
-            except json.JSONDecodeError:
+                    return get_default_skills_for_role(target_role, extracted_skills)
+            except Exception as e:  # Broader exception to catch any JSON parsing issues
+                logger.error(f"Error parsing JSON from response: {e}")
                 # JSON parsing failed
-                return get_default_skills_for_role(target_role)
+                return get_default_skills_for_role(target_role, extracted_skills)
         else:
             # Try line-by-line parsing as fallback
             skills = []
             for line in response.split('\n'):
                 line = line.strip(' "\',-.')
                 if line and len(line) > 3 and not line.startswith('[') and not line.endswith(']'):
-                    skills.append(line)
+                    if not any(extracted.lower() == line.lower() for extracted in extracted_skills):
+                        skills.append(line)
             
             if skills:
                 return skills[:5]  # Limit to 5 skills
             else:
-                return get_default_skills_for_role(target_role)
+                return get_default_skills_for_role(target_role, extracted_skills)
             
     except Exception as e:
         logger.error(f"Error identifying missing skills: {str(e)}")
-        return get_default_skills_for_role(target_role)
+        return get_default_skills_for_role(target_role, extracted_skills)
 
-def get_default_skills_for_role(role: str) -> List[str]:
+def get_default_skills_for_role(role: str, extracted_skills: List[str] = None) -> List[str]:
     """
-    Get default skills for a role when LLM processing fails.
+    Use direct LLM query to get role skills for the target role.
+    Now fully dynamic with no hardcoded fallbacks.
     
     Args:
         role (str): The target role
+        extracted_skills (list, optional): List of skills already extracted from resume
         
     Returns:
-        list: Default skills based on role
+        list: Role-appropriate skills or error message
     """
-    role_lower = role.lower()
+    try:
+        # Use the ChatService for a dynamic approach
+        from backend.services.chat_service import ChatService
+        chat_service = ChatService()
+        
+        # Create a straightforward prompt asking for skills
+        prompt = (
+            f"You are a career advisor in 2025 specializing in {role} roles. "
+            f"A job candidate has these skills: {', '.join(extracted_skills[:10] if extracted_skills else ['No skills available'])}. "
+            f"Identify the 5 most important technical skills they still need to develop "
+            f"for a {role} position that are not already in their skill set. "
+            f"Return ONLY a JSON array of skill names without any additional text."
+        )
+        
+        # Get response from LLM
+        success, response = chat_service.get_llm_response(prompt)
+        
+        if not success:
+            logger.error("LLM failed to generate a response for default skills")
+            return ["Sorry, I couldn't analyze your skill gaps at this time. Please try again later."]
+            
+        # Try to extract skills from the response
+        import json
+        import re
+        
+        # First try to parse as JSON
+        json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
+        if json_match:
+            try:
+                skills_json = f"[{json_match.group(1)}]"
+                skills = json.loads(skills_json)
+                if skills and isinstance(skills, list) and len(skills) > 0:
+                    # Filter out any skills they might already have
+                    if extracted_skills:
+                        skills = [s for s in skills if isinstance(s, str) and len(s.strip()) > 2 and 
+                                  not any(s.lower() in e.lower() or e.lower() in s.lower() for e in extracted_skills)]
+                    else:
+                        skills = [s for s in skills if isinstance(s, str) and len(s.strip()) > 2]
+                        
+                    if skills:
+                        return skills[:5]
+            except Exception as e:
+                logger.error(f"Error parsing JSON skills: {e}")
+        
+        # If JSON parsing failed, try line-by-line extraction
+        skills = []
+        for line in response.split('\n'):
+            line = line.strip(' "\',-.*•1234567890.[](){}"')
+            if line and len(line) > 3 and not line.startswith('#'):
+                skills.append(line)
+        
+        # Filter and return skills if we found any
+        if skills:
+            if extracted_skills:
+                skills = [s for s in skills if not any(s.lower() in e.lower() or e.lower() in s.lower() 
+                         for e in extracted_skills)]
+            return skills[:5]
+        
+        # Try one more time with an even simpler prompt
+        prompt = f"What are the 5 essential skills needed for a {role} role in 2025? Return only a JSON array."
+        success, response = chat_service.get_llm_response(prompt)
+        
+        if success:
+            # Try to extract skills from the response
+            json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
+            if json_match:
+                try:
+                    skills_json = f"[{json_match.group(1)}]"
+                    skills = json.loads(skills_json)
+                    if skills and isinstance(skills, list) and len(skills) > 0:
+                        return [s for s in skills if isinstance(s, str)][:5]
+                except Exception as e:
+                    logger.warning(f"Error parsing JSON from second attempt: {e}")
+            
+            # Try extracting from text if JSON failed
+            skills = []
+            for line in response.split('\n'):
+                line = line.strip(' "\',-.*•1234567890.[](){}"')
+                if line and len(line) > 3 and not line.startswith('#'):
+                    skills.append(line)
+            
+            if skills:
+                return skills[:5]
+        
+        # If we've reached this point, all LLM calls failed
+        logger.error("All LLM attempts failed to extract valid skills")
+        return ["Sorry, I couldn't analyze your skill gaps at this time. Please try again later."]
+        
+    except Exception as e:
+        logger.error(f"Error getting skills via LLM: {str(e)}")
+        return ["Sorry, I couldn't analyze your skill gaps at this time. Please try again later."]
+
+def fallback_llm_skills_for_role(role: str, extracted_skills: List[str] = None) -> List[str]:
+    """
+    Use the LLM directly to suggest skills when other methods fail.
+    No hardcoded skills or keywords.
     
-    if any(word in role_lower for word in ["system", "systems"]):
-        return ["Systems Architecture", "Technical Documentation", "Performance Optimization", 
-                "Project Management", "Integration Testing"]
-                
-    elif any(word in role_lower for word in ["data", "scientist", "analyst"]):
-        return ["Statistical Modeling", "Data Visualization", "SQL", 
-                "Machine Learning", "Data Engineering"]
-                
-    elif any(word in role_lower for word in ["software", "developer"]):
-        return ["System Design", "API Development", "Testing Practices", 
-                "DevOps Skills", "Code Optimization"]
-                
-    elif "engineer" in role_lower:
-        return ["System Architecture", "Technical Documentation", "Performance Optimization", 
-                "Security Practices", "Project Management"]
-                
-    else:
-        return ["Technical Skills", "Project Management", "Industry Knowledge", 
-                "Communication", "Problem Solving"]
+    Args:
+        role (str): The target role
+        extracted_skills (list, optional): Skills already on the resume
+        
+    Returns:
+        list: Missing skills needed for the role or error message
+    """
+    logger.info(f"Using fallback LLM for {role} with {len(extracted_skills) if extracted_skills else 0} extracted skills")
+    try:
+        chat_service = ChatService()
+        
+        # Create a prompt that lets the LLM determine skill relevance and gaps 
+        # without any hardcoded keywords or categories
+        prompt = (
+            f"As a career advisor for {role} roles in 2025, analyze the candidate's current skills: "
+            f"{', '.join(extracted_skills[:15] if extracted_skills else ['No skills provided'])}.\n\n"
+            f"First, determine if they already have strong role-relevant skills. "
+            f"If they have strong role-relevant skills, suggest 5 specialized/advanced skills to complement their expertise. "
+            f"If they lack role-relevant skills, suggest 5 foundational skills for this role. "
+            f"Return ONLY a JSON array of skill names, no explanation or categorization."
+        )
+        
+        # Get LLM response
+        success, response = chat_service.get_llm_response(prompt)
+        
+        if not success:
+            logger.error("LLM failed to provide a response")
+            return ["Sorry, I couldn't analyze your skill gaps at this time. Please try again later."]
+            
+        # Parse response
+        import json
+        import re
+        
+        # Try to find JSON array
+        json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
+        if json_match:
+            try:
+                skills_json = f"[{json_match.group(1)}]"
+                skills = json.loads(skills_json)
+                if isinstance(skills, list) and len(skills) > 0:
+                    # Filter to ensure we return only valid string skills
+                    valid_skills = [s for s in skills if isinstance(s, str) and len(s.strip()) > 2]
+                    if valid_skills:
+                        return valid_skills[:5]
+            except Exception as e:
+                logger.error(f"Error parsing JSON from LLM response: {e}")
+        
+        # If JSON parsing failed, try line-by-line extraction
+        skills = []
+        for line in response.split('\n'):
+            # Clean the line of common formatting characters
+            line = line.strip(' "\',-.*•0123456789')
+            if line and len(line) > 3 and not line.startswith('[') and not line.endswith(']'):
+                skills.append(line)
+        
+        # If no skills were found, return an error message
+        if not skills:
+            logger.error("No skills were extracted from LLM response")
+            return ["Sorry, I couldn't analyze your skill gaps at this time. Please try again later."]
+        
+        return skills[:5]
+        
+    except Exception as e:
+        logger.error(f"Fallback LLM skills error: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        # Return a clear error message
+        return ["Sorry, I couldn't analyze your skill gaps at this time. Please try again later."]
 
 def store_career_analysis(username: str, resume_text: str, extracted_skills: List[str], 
                           target_role: str, missing_skills: List[str] = None) -> str:
     """
     Store career transition analysis in the database with optimized approach.
+    Ensures missing skills are always identified and stored.
     
     Args:
         username (str): The username
@@ -189,8 +415,22 @@ def store_career_analysis(username: str, resume_text: str, extracted_skills: Lis
         record_id = str(uuid.uuid4())
         
         # If missing skills not provided, identify them
-        if not missing_skills:
+        if not missing_skills or len(missing_skills) == 0:
+            logger.info(f"Missing skills not provided for {username}, generating them now")
             missing_skills = process_missing_skills(extracted_skills, target_role)
+            
+            # Ensure we got valid missing skills
+            if not missing_skills or len(missing_skills) == 0:
+                logger.warning(f"Failed to generate missing skills for {username}, using fallback")
+                # Generate some basic fallback skills to avoid null values
+                missing_skills = get_default_skills_for_role(target_role, extracted_skills)
+        
+        # Validate missing skills - ensure it's not an error message
+        error_indicators = ["sorry", "trouble", "try again", "error", "couldn't"]
+        if any(any(indicator in skill.lower() for indicator in error_indicators) for skill in missing_skills):
+            logger.warning(f"Missing skills contains error messages for {username}, using fallback")
+            # Use fallback if we detected error messages in the missing skills
+            missing_skills = get_default_skills_for_role(target_role, extracted_skills)
         
         # Clean resume text for SQL insertion
         cleaned_resume_text = resume_text.replace("'", "''")
@@ -215,15 +455,17 @@ def store_career_analysis(username: str, resume_text: str, extracted_skills: Lis
         )
         
         conn.commit()
-        logger.info(f"Successfully stored career analysis for {username}")
+        logger.info(f"Successfully stored career analysis with missing skills for {username}")
         return record_id
         
     except Exception as e:
         logger.error(f"Error storing career analysis: {str(e)}")
         return None
     finally:
-        cursor.close()
-        conn.close()
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def get_career_transition_courses(target_role: str, missing_skills: List[str], limit: int = 6) -> Dict:
     """
@@ -404,110 +646,25 @@ def get_career_transition_courses(target_role: str, missing_skills: List[str], l
 
 def get_fallback_courses(role: str) -> List[Dict]:
     """
-    Get fallback courses when database query fails.
+    Returns error message when LLM fails.
+    No course generation, only error message.
     
     Args:
         role (str): Target role
         
     Returns:
-        list: List of course dictionaries
+        list: Error message for user to try again later
     """
-    role_lower = role.lower()
-    
-    # Default common platforms
-    platforms = ["Coursera", "Udemy", "edX"]
-    
-    # Basic course structure
-    courses = []
-    
-    # Create fallback courses based on role
-    if "data" in role_lower or "scientist" in role_lower or "analyst" in role_lower:
-        courses = [
-            {
-                "COURSE_NAME": "Data Science Fundamentals",
-                "DESCRIPTION": "Learn the key concepts and tools for data science and machine learning",
-                "SKILLS": "Python, Statistics, Data Visualization, Machine Learning",
-                "URL": "https://www.coursera.org/specializations/data-science-fundamentals",
-                "LEVEL": "Beginner",
-                "PLATFORM": "Coursera",
-                "LEVEL_CATEGORY": "BEGINNER"
-            },
-            {
-                "COURSE_NAME": "Advanced Machine Learning",
-                "DESCRIPTION": "Master advanced machine learning techniques and algorithms",
-                "SKILLS": "Deep Learning, Statistical Models, Feature Engineering",
-                "URL": "https://www.coursera.org/specializations/advanced-machine-learning",
-                "LEVEL": "Advanced",
-                "PLATFORM": "Coursera",
-                "LEVEL_CATEGORY": "ADVANCED"
-            }
-        ]
-    elif "system" in role_lower or "systems" in role_lower:
-        courses = [
-            {
-                "COURSE_NAME": "Systems Design and Architecture",
-                "DESCRIPTION": "Learn essential concepts in designing and implementing complex systems",
-                "SKILLS": "Architecture Patterns, System Integration, Documentation",
-                "URL": "https://www.udemy.com/course/system-design-architecture",
-                "LEVEL": "Intermediate",
-                "PLATFORM": "Udemy",
-                "LEVEL_CATEGORY": "INTERMEDIATE"
-            },
-            {
-                "COURSE_NAME": "Systems Engineering Fundamentals",
-                "DESCRIPTION": "Master the principles of systems engineering and project management",
-                "SKILLS": "Requirements Analysis, System Testing, Project Management",
-                "URL": "https://www.edx.org/learn/systems-engineering",
-                "LEVEL": "Beginner",
-                "PLATFORM": "edX",
-                "LEVEL_CATEGORY": "BEGINNER"
-            }
-        ]
-    elif "software" in role_lower or "developer" in role_lower or "engineer" in role_lower:
-        courses = [
-            {
-                "COURSE_NAME": "Software Engineering Principles",
-                "DESCRIPTION": "Master essential software engineering concepts and practices",
-                "SKILLS": "Software Design, Testing, CI/CD, Version Control",
-                "URL": "https://www.udemy.com/course/software-engineering-principles",
-                "LEVEL": "Beginner to Intermediate",
-                "PLATFORM": "Udemy",
-                "LEVEL_CATEGORY": "BEGINNER"
-            },
-            {
-                "COURSE_NAME": "Advanced Software Architecture",
-                "DESCRIPTION": "Learn advanced principles of software architecture and design patterns",
-                "SKILLS": "Design Patterns, System Architecture, Scalability",
-                "URL": "https://www.coursera.org/learn/software-architecture",
-                "LEVEL": "Advanced",
-                "PLATFORM": "Coursera",
-                "LEVEL_CATEGORY": "ADVANCED"
-            }
-        ]
-    else:
-        # Generic courses for any role
-        courses = [
-            {
-                "COURSE_NAME": f"Essential Skills for {role}",
-                "DESCRIPTION": f"Develop the core competencies needed for a successful career as a {role}",
-                "SKILLS": "Technical Skills, Communication, Problem Solving",
-                "URL": "https://www.coursera.org/professional-certificates",
-                "LEVEL": "Beginner",
-                "PLATFORM": "Coursera",
-                "LEVEL_CATEGORY": "BEGINNER"
-            },
-            {
-                "COURSE_NAME": f"Advanced {role} Masterclass",
-                "DESCRIPTION": f"Take your {role} skills to the next level with industry best practices",
-                "SKILLS": "Advanced Techniques, Industry Knowledge, Specialization",
-                "URL": "https://www.udemy.com/courses/professional-development",
-                "LEVEL": "Advanced",
-                "PLATFORM": "Udemy",
-                "LEVEL_CATEGORY": "ADVANCED"
-            }
-        ]
-    
-    return courses
+    # Return error message for any request
+    return [{
+        "COURSE_NAME": "Cannot process your request at this moment",
+        "DESCRIPTION": "We're having trouble processing your request. Please try again later.",
+        "SKILLS": "Error Processing Request",
+        "URL": "",
+        "PLATFORM": "",
+        "LEVEL": "Error",
+        "LEVEL_CATEGORY": "ERROR"
+    }]
 
 def format_transition_plan(username: str, current_skills: List[str], target_role: str, 
                           missing_skills: List[str], courses: List[Dict]) -> Dict[str, str]:
@@ -524,27 +681,62 @@ def format_transition_plan(username: str, current_skills: List[str], target_role
     Returns:
         dict: Dictionary with different sections of the formatted plan
     """
-    # Categorize current skills by relevance to target role
+    # Categorize current skills using LLM instead of hardcoded keywords
     transferable_skills = []
     strong_skills = []
     
-    # Identify some key terms for the target role to categorize skills
-    role_keywords = []
-    if "data" in target_role.lower():
-        role_keywords = ["data", "sql", "analysis", "analytics", "visualization", "python", "statistics"]
-    elif "system" in target_role.lower() or "systems" in target_role.lower():
-        role_keywords = ["system", "architecture", "engineering", "integration", "design", "documentation"]
-    elif "software" in target_role.lower() or "developer" in target_role.lower():
-        role_keywords = ["software", "development", "code", "programming", "api", "testing"]
-    elif "engineer" in target_role.lower():
-        role_keywords = ["engineering", "technical", "design", "architecture", "development", "system"]
-    
-    # Categorize skills
-    for skill in current_skills:
-        if any(keyword in skill.lower() for keyword in role_keywords):
-            transferable_skills.append(skill)
-        else:
-            strong_skills.append(skill)
+    try:
+        # Use the ChatService to determine relevant skills for the role
+        from backend.services.chat_service import ChatService
+        chat_service = ChatService()
+        
+        # First get all current skills as a simple array
+        current_skills_str = ", ".join(current_skills)
+        
+        # Create a prompt to categorize skills
+        prompt = (
+            f"You are a career advisor helping someone transition to a {target_role} role. "
+            f"Analyze this list of their current skills: {current_skills_str}\n\n"
+            f"Identify which skills are directly relevant/transferable to a {target_role} role. "
+            f"Return ONLY a JSON array of the transferable skill names, nothing else."
+        )
+        
+        # Get response from LLM
+        success, response = chat_service.get_llm_response(prompt)
+        
+        if success:
+            # Try to extract transferable skills from JSON
+            import json
+            import re
+            
+            json_match = re.search(r'\[(.*?)\]', response, re.DOTALL)
+            if json_match:
+                try:
+                    skills_json = f"[{json_match.group(1)}]"
+                    transferable_from_llm = json.loads(skills_json)
+                    if transferable_from_llm and isinstance(transferable_from_llm, list):
+                        # Create a lowercase lookup for matching
+                        transferable_lower = [s.lower() for s in transferable_from_llm if isinstance(s, str)]
+                        
+                        # Match with original skill names to preserve case
+                        for skill in current_skills:
+                            if skill.lower() in transferable_lower or any(t.lower() in skill.lower() for t in transferable_from_llm):
+                                transferable_skills.append(skill)
+                            else:
+                                strong_skills.append(skill)
+                except Exception as e:
+                    logger.error(f"Error parsing transferable skills: {e}")
+        
+        # If LLM categorization failed, fall back to a simpler approach without hardcoded keywords
+        if not transferable_skills and not strong_skills:
+            raise Exception("LLM categorization failed")
+            
+    except Exception as e:
+        logger.error(f"Error categorizing skills with LLM: {e}")
+        # Simple fallback without hardcoded role-specific keywords
+        # Just distribute skills evenly between categories
+        transferable_skills = current_skills[:len(current_skills)//2]
+        strong_skills = current_skills[len(current_skills)//2:]
     
     # Limit to top skills
     transferable_skills = transferable_skills[:8]
@@ -773,21 +965,46 @@ The courses below are organized into a structured learning path you can complete
                 
                 course_msg += "---\n\n"
     
-    # Format career advice similar to learning path
-    career_advice = f"""
-# 💼 Career Transition Strategy for {target_role}
+    # Generate career advice using LLM
+    try:
+        # Use the ChatService for dynamic, personalized career advice
+        chat_service = ChatService()
+        
+        # Create a prompt to generate career advice
+        career_advice_prompt = (
+            f"You are a career advisor helping someone transition to a {target_role} role. "
+            f"The candidate has the following skills already: {', '.join(current_skills[:10])}. "
+            f"They need to develop these skills: {', '.join(missing_skills[:5])}. "
+            f"Their most transferable skills for this role are: {', '.join(transferable_skills[:5] if transferable_skills else ['None identified'])}. "
+            f"Provide a 5-step career transition strategy tailored to their situation in MARKDOWN format. "
+            f"Include specific advice about: building skills, creating portfolio projects, adapting their resume, networking, "
+            f"and practical next steps. Format as a professional career advice section with bullet points."
+        )
+        
+        # Get advice from LLM
+        success, llm_career_advice = chat_service.get_llm_response(career_advice_prompt)
+        
+        # Use the LLM-generated advice if successful
+        if success and len(llm_career_advice) > 100:  # Ensure we got a substantial response
+            # Add a title if not present
+            if not llm_career_advice.strip().startswith("#"):
+                career_advice = f"# 💼 Career Transition Strategy for {target_role}\n\n{llm_career_advice}"
+            else:
+                career_advice = llm_career_advice
+        else:
+            # If LLM fails, use a simple error message
+            career_advice = f"""
+# 💼 Career Transition Strategy 
 
-Follow this step-by-step roadmap to maximize your chances of a successful career transition:
+Sorry, we're having trouble generating personalized career advice at this moment. Please try again later.
+"""
+    except Exception as e:
+        logger.error(f"Error generating career advice with LLM: {e}")
+        # Fallback to a simple error message
+        career_advice = f"""
+# 💼 Career Transition Strategy 
 
-1. **Build transferable skills** - Focus first on {', '.join(missing_skills[:3])} through the recommended courses above
-2. **Create a transition portfolio** - Develop 2-3 projects that showcase your new {target_role} skills while leveraging your existing expertise in {', '.join(transferable_skills[:2] if transferable_skills else ['your field'])}
-3. **Bridge your experience** - Reframe your resume to highlight how your background in {strong_skills[0] if strong_skills else 'your current role'} is relevant to {target_role} positions
-4. **Network strategically** - Connect with current {target_role}s on LinkedIn and professional communities to understand the industry's needs
-5. **Target transitional roles** - Look for hybrid positions that value both your existing expertise and your new skills
-
-With dedicated effort on this plan, most career changers can successfully transition within 3-6 months.
-
-Do you have any questions about your career transition plan?
+Sorry, we're having trouble generating personalized career advice at this moment. Please try again later.
 """
     
     return {
@@ -798,10 +1015,12 @@ Do you have any questions about your career transition plan?
         "has_valid_courses": has_valid_courses
     }
 
-# TODO: Refactor this function to remove hardcoded career advice.
-# This should be moved to a configuration file or database to make it:
-# 1. Role-specific (currently only shows data engineering advice)
-# 2. Easier to update without code changes
-# 3. Potentially personalized based on user's skill assessment
-# 4. Maybe format_transition_plan() needs to be moved to ui_service.py since it's not a service function.
+# NOTE: This functionality has been refactored to remove hardcoded career advice.
+# Now the career advice is dynamically generated based on:
+# 1. The target role (with role-specific guidance)
+# 2. User's current skills (categorized by relevance)
+# 3. Identified skill gaps (with prioritization)
+# Additional improvements could include:
+# 1. Moving formatting functions to ui_service.py for better separation of concerns
+# 2. Creating a configuration system for customization of advice templates
 

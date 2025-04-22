@@ -7,7 +7,7 @@ import logging
 from backend.services.chat_service import ChatService
 # from backend.database import save_chat_history, store_skill_ratings
 from backend.services.resume_parser import extract_text
-from backend.services.skill_matcher import extract_skills_from_text
+
 from backend.services.career_transition_service import (
     process_missing_skills, 
     store_career_analysis, 
@@ -49,6 +49,8 @@ class ChatHistoryData(BaseModel):
     user_name: str
     chat_history: list
     timestamp: Optional[str] = None
+    source_page: Optional[str] = "Unknown"
+    target_role: Optional[str] = None
 
 class LearningPathData(BaseModel):
     name: str
@@ -226,16 +228,20 @@ def save_chat_history(data: ChatHistoryData):
         # Convert chat_history to JSON string if it's not already
         chat_history_str = json.dumps(data.chat_history) if isinstance(data.chat_history, list) else data.chat_history
         
-        # Save to database
+        # Save to database with source_page and target_role
         flag, message = save_chat_history(
             user_name=data.user_name,
             chat_history=chat_history_str,
-            cur_timestamp=data.timestamp
+            cur_timestamp=data.timestamp,
+            source_page=data.source_page,
+            target_role=data.target_role
         )
         if flag:
             return {
                 "message": message,
-                "user_name": data.user_name
+                "user_name": data.user_name,
+                "source_page": data.source_page,
+                "target_role": data.target_role
             }
         else:
             raise HTTPException(
@@ -340,7 +346,11 @@ async def extract_resume_text(file: UploadFile = File(...)):
         )
     except Exception as e:
         logging.error(f"Error extracting text from resume: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing resume: {str(e)}")
+        return ResumeExtractResponse(
+            success=False,
+            text="",
+            message="Sorry, we're having trouble processing your resume. Please try again later."
+        )
 
 @router.post("/skills/extract", response_model=SkillsExtractResponse)
 async def extract_skills_endpoint(request: SkillsExtractRequest):
@@ -366,30 +376,21 @@ async def extract_skills_endpoint(request: SkillsExtractRequest):
         )
     except Exception as e:
         logging.error(f"Error extracting skills: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error extracting skills: {str(e)}")
+        return SkillsExtractResponse(
+            success=False,
+            skills=[],
+            message="Sorry, we're having trouble extracting skills at the moment. Please try again later."
+        )
 
 @router.post("/skills/extract-regex", response_model=SkillsExtractResponse)
 async def extract_skills_regex_endpoint(request: SkillsExtractRequest):
-    """Extract skills from resume text using regex."""
-    try:
-        # Extract skills using regex
-        extracted_skills = extract_skills_from_text(request.resume_text)
-        
-        if not extracted_skills:
-            return SkillsExtractResponse(
-                success=False,
-                skills=[],
-                message="Could not extract skills from the resume text using regex."
-            )
-        
-        return SkillsExtractResponse(
-            success=True,
-            skills=extracted_skills,
-            message="Skills extracted successfully using regex"
-        )
-    except Exception as e:
-        logging.error(f"Error extracting skills with regex: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error extracting skills with regex: {str(e)}")
+    """Returns error message as we're removing regex-based extraction."""
+    # We're no longer using regex-based extraction
+    return SkillsExtractResponse(
+        success=False,
+        skills=[],
+        message="Cannot process your request at this moment. Please try again later."
+    )
 
 @router.post("/skills/missing", response_model=MissingSkillsResponse)
 async def process_missing_skills_endpoint(request: MissingSkillsRequest):
@@ -401,6 +402,23 @@ async def process_missing_skills_endpoint(request: MissingSkillsRequest):
             request.target_role
         )
         
+        if not missing_skills:
+            return MissingSkillsResponse(
+                success=False,
+                missing_skills=[],
+                message="Could not identify missing skills at this time. Please try again later."
+            )
+            
+        # Check if the response contains an error message
+        error_indicators = ["sorry", "trouble", "try again", "error", "couldn't"]
+        for skill in missing_skills:
+            if any(indicator in skill.lower() for indicator in error_indicators):
+                return MissingSkillsResponse(
+                    success=False,
+                    missing_skills=[],
+                    message="Sorry, we're having trouble analyzing skill gaps at the moment. Please try again later."
+                )
+        
         return MissingSkillsResponse(
             success=True,
             missing_skills=missing_skills,
@@ -408,13 +426,27 @@ async def process_missing_skills_endpoint(request: MissingSkillsRequest):
         )
     except Exception as e:
         logging.error(f"Error processing missing skills: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error processing missing skills: {str(e)}")
+        return MissingSkillsResponse(
+            success=False,
+            missing_skills=[],
+            message="Sorry, we're having trouble analyzing skill gaps at the moment. Please try again later."
+        )
 
 @router.post("/career-analysis/store", response_model=CareerAnalysisResponse)
 async def store_career_analysis_endpoint(request: CareerAnalysisRequest):
     """Store career analysis data."""
     try:
-        # Store career analysis
+        # Ensure missing_skills is not empty
+        if not request.missing_skills or len(request.missing_skills) == 0:
+            # Try to generate missing skills if not provided
+            missing_skills = process_missing_skills(
+                request.extracted_skills, 
+                request.target_role
+            )
+            if missing_skills and len(missing_skills) > 0:
+                request.missing_skills = missing_skills
+                
+        # Store career analysis with missing skills
         resume_id = store_career_analysis(
             username=request.username,
             resume_text=request.resume_text,
@@ -426,23 +458,38 @@ async def store_career_analysis_endpoint(request: CareerAnalysisRequest):
         if not resume_id:
             return CareerAnalysisResponse(
                 success=False,
-                message="Failed to store career analysis data."
+                message="Failed to store career analysis data. Please try again later."
             )
         
         return CareerAnalysisResponse(
             success=True,
             resume_id=resume_id,
-            message="Career analysis stored successfully"
+            message="Career analysis stored successfully with missing skills"
         )
     except Exception as e:
         logging.error(f"Error storing career analysis: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error storing career analysis: {str(e)}")
+        return CareerAnalysisResponse(
+            success=False,
+            message="Sorry, we're having trouble storing your career analysis. Please try again later."
+        )
 
 @router.post("/career-courses", response_model=CareerCoursesResponse)
 async def get_career_transition_courses_endpoint(request: CareerCoursesRequest):
-    """Get career transition courses."""
+    """Get career transition courses based on missing skills."""
     try:
-        # Get career transition courses
+        # Validate missing skills input
+        if not request.missing_skills or len(request.missing_skills) == 0:
+            # Try to get the latest resume entry for this target role to find missing skills
+            # This would require the username, which we don't have in this endpoint
+            # For now, return an error message recommending the proper flow
+            return CareerCoursesResponse(
+                success=False,
+                courses=[],
+                count=0,
+                message="No missing skills provided. Please analyze your resume first to identify skill gaps."
+            )
+            
+        # Get career transition courses based on missing skills
         courses_result = get_career_transition_courses(
             target_role=request.target_role,
             missing_skills=request.missing_skills,
@@ -454,18 +501,23 @@ async def get_career_transition_courses_endpoint(request: CareerCoursesRequest):
                 success=False,
                 courses=[],
                 count=0,
-                message="No courses found for the specified criteria."
+                message="No courses found for your missing skills. Please try with different skills or a different target role."
             )
         
         return CareerCoursesResponse(
             success=True,
             courses=courses_result.get("courses", []),
             count=courses_result.get("count", 0),
-            message="Courses retrieved successfully"
+            message="Courses recommended successfully based on your missing skills"
         )
     except Exception as e:
         logging.error(f"Error getting career transition courses: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error getting career transition courses: {str(e)}")
+        return CareerCoursesResponse(
+            success=False,
+            courses=[],
+            count=0,
+            message="Sorry, we're having trouble finding courses for you right now. Please try again later."
+        )
 
 @router.post("/transition-plan", response_model=TransitionPlanResponse)
 async def format_transition_plan_endpoint(request: TransitionPlanRequest):
@@ -491,4 +543,68 @@ async def format_transition_plan_endpoint(request: TransitionPlanRequest):
         )
     except Exception as e:
         logging.error(f"Error formatting transition plan: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error formatting transition plan: {str(e)}")
+        return TransitionPlanResponse(
+            success=False,
+            introduction="",
+            skill_assessment="",
+            course_recommendations="",
+            career_advice="",
+            has_valid_courses=False,
+            message="Sorry, we're having trouble generating your transition plan. Please try again later."
+        )
+        
+class ResumeCoursesRequest(BaseModel):
+    """Request model for getting courses based on resume missing skills."""
+    username: str
+    target_role: Optional[str] = None
+    limit: Optional[int] = 6
+
+@router.post("/resume-courses", response_model=CareerCoursesResponse)
+async def get_resume_courses_endpoint(request: ResumeCoursesRequest):
+    """Get course recommendations based on missing skills from the most recent resume."""
+    try:
+        from backend.database import get_latest_resume_missing_skills
+        
+        # Get missing skills from the most recent resume
+        missing_skills = get_latest_resume_missing_skills(
+            username=request.username,
+            target_role=request.target_role
+        )
+        
+        if not missing_skills:
+            return CareerCoursesResponse(
+                success=False,
+                courses=[],
+                count=0,
+                message="No missing skills found in your resume. Please analyze your resume first."
+            )
+        
+        # Get career transition courses based on missing skills
+        courses_result = get_career_transition_courses(
+            target_role=request.target_role,
+            missing_skills=missing_skills,
+            limit=request.limit
+        )
+        
+        if not courses_result or courses_result.get("count", 0) == 0:
+            return CareerCoursesResponse(
+                success=False,
+                courses=[],
+                count=0,
+                message="No courses found for your missing skills. Please try with a different target role."
+            )
+        
+        return CareerCoursesResponse(
+            success=True,
+            courses=courses_result.get("courses", []),
+            count=courses_result.get("count", 0),
+            message=f"Courses recommended successfully based on your resume's missing skills for {request.target_role}"
+        )
+    except Exception as e:
+        logging.error(f"Error getting courses from resume: {str(e)}")
+        return CareerCoursesResponse(
+            success=False,
+            courses=[],
+            count=0,
+            message="Sorry, we're having trouble finding courses for you right now. Please try again later."
+        )
