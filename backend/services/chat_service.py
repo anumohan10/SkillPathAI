@@ -413,7 +413,6 @@ class ChatService:
         if context:
             ctx = self._sanitize(context)
             full = f"{ctx}\n\n{prompt}"
-
         for model in ['llama3.1-70b','llama3.1-8b','snowflake-llama-3.1-405b']:
             try:
                 with self.get_cursor() as cur:
@@ -510,7 +509,7 @@ class ChatService:
         )
         
         try:
-            response = self.get_llm_response(prompt)
+            flag, response = self.get_llm_response(prompt)
             
             # Extract JSON list from response 
             # (handles cases where model might add explanatory text)
@@ -520,6 +519,7 @@ class ChatService:
             if json_match:
                 skills_json = f"[{json_match.group(1)}]"
                 skills = json.loads(skills_json)
+                logger.info(f"Extracted skills: {skills}")
                 return skills
             else:
                 # Fallback extraction if JSON parsing fails
