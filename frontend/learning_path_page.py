@@ -25,15 +25,33 @@ logging.basicConfig(
 logger = logging.getLogger(__name__) # Use __name__ for logger
 now = datetime.now()
 
-def save_session_state_api(user_name, session_state, cur_timestamp, source_page, role):
+# Define API URL - should be configurable in production
+API_URL = "http://localhost:8000"
+
+# Custom JSON encoder to handle non-serializable objects
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, pd.DataFrame):
+            return obj.to_dict('records')
+        elif isinstance(obj, pd.Series):
+            return obj.to_dict()
+        elif isinstance(obj, (pd.Timestamp, datetime)):
+            return obj.isoformat()
+        elif hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        return str(obj)
+
+def save_session_state_api(user_name, session_state_data, cur_timestamp, source_page, role):
     """Save session state to the database."""
     try:
+        
+        session_state_json = json.dumps(session_state_data, cls=CustomJSONEncoder)
         # Call the API endpoint to save session state
         response = requests.post(
-            "http://localhost:8000/user-input/chat-history",
+            f"{API_URL}/user-input/save-session-state",
             json={
                 "user_name": user_name,
-                "session_state": session_state, 
+                "session_state": session_state_json,  # Send as JSON string
                 "timestamp": cur_timestamp,
                 "source_page": source_page,
                 "role": role
@@ -178,7 +196,7 @@ def render_learning_path_page(): # Renamed function
         if 'lp_messages' in st.session_state and len(st.session_state.lp_messages) > 0 and st.session_state.get('results_displayed', False):
             save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                session_state=st.session_state.to_dict(),
+                session_state_data=st.session_state.to_dict(),
                 cur_timestamp=st.session_state.cur_timestamp,
                 source_page="learning_path",
                 role=st.session_state.lp_data.get("target_role", "Unknown Role")
@@ -471,7 +489,7 @@ def render_learning_path_page(): # Renamed function
                 if st.session_state.get('results_displayed', False):
                     save_session_state_api(
                         user_name=st.session_state.get("username", "User"),
-                        session_state=st.session_state.to_dict(),
+                        session_state_data=st.session_state.to_dict(),
                         cur_timestamp=st.session_state.cur_timestamp,
                         source_page="learning_path",
                         role=st.session_state.lp_data.get("target_role", "Unknown Role")
@@ -532,8 +550,9 @@ def render_learning_path_page(): # Renamed function
         if len(st.session_state.get("lp_messages", [])) > 0 and st.session_state.get('results_displayed', False):
             save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                session_state=st.session_state.to_dict(),
-                cur_timestamp=st.session_state.cur_timestampsource_page="learning_path",
+                session_state_data=st.session_state.to_dict(),
+                cur_timestamp=st.session_state.cur_timestamp,
+                source_page="learning_path",
                 role=st.session_state.lp_data.get("target_role", "Unknown Role")
             )
             logger.info("Saved chat history on sidebar restart (results were displayed)")
@@ -553,7 +572,7 @@ def render_learning_path_page(): # Renamed function
         if st.session_state.get('results_displayed', False):
             save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                session_state=st.session_state.to_dict(),
+                session_state_data=st.session_state.to_dict(),
                 cur_timestamp=st.session_state.cur_timestamp,
                 source_page="learning_path",
                 role=st.session_state.lp_data.get("target_role", "Unknown Role")

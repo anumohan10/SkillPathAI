@@ -28,18 +28,26 @@ def render_dashboard_page():
     st.header("Dashboard")
     st.write(f"Welcome, {st.session_state.get('username', 'Guest')}!")
 
+    with st.expander("Diagnostic Information (Click to expand)"):
+        debug_container = st.container()
+    
+   
+    
+    st.session_state
+    debug_container.json(st.session_state.to_dict())
     with st.container():
         st.markdown('<div class="container-card" style="margin-top: 20px;">', unsafe_allow_html=True)
         st.subheader("🕓 Recent Chat History")
 
         username = st.session_state.get("username", "User")
         recent_chats = fetch_recent_chats(username)
-
+        print("Recent Chat:\n", recent_chats)
         if not recent_chats:
             st.info("No chat history found.")
         else:
             for i, record in enumerate(recent_chats):
-                chat_list = record.get("chat_history", [])
+                chat_list = record.get("state_data", [])
+                print("State_Data:\n", chat_list)
                 timestamp = record.get("cur_timestamp")
                 source = record.get("source_page", "unknown")
 
@@ -49,20 +57,22 @@ def render_dashboard_page():
                         chat_list = json.loads(chat_list)
                     except json.JSONDecodeError:
                         chat_list = []
-
                 try:
                     preview = chat_list[-1]["content"][:80] + "..." if isinstance(chat_list, list) and chat_list else "(empty)"
                 except Exception as e:
                     preview = f"(preview error: {e})"
 
+                
                 label = f"🗨️ {source.replace('_', ' ').title()} Chat – {timestamp[:19].replace('T',' ')}"
                 if st.button(label, key=f"chat_{i}"):
                     if source == "career_transition":
-                        st.session_state.ct_messages = chat_list
+                        filtered_chat_list = {k: v for k, v in chat_list.items() if k not in ("main_nav","ct_followup_input")}
+                        st.session_state.update(filtered_chat_list)
                         st.session_state.ct_state = "display_results"
                         st.session_state.current_page = "Career Transition"
                     elif source == "learning_path":
-                        st.session_state.lp_messages = chat_list
+                        filtered_chat_list = {k: v for k, v in chat_list.items() if k not in ("main_nav", "lp_followup_input")}
+                        st.session_state.update(filtered_chat_list)
                         st.session_state.lp_state = "display_results"
                         st.session_state.current_page = "Learning Path"
                     st.session_state.results_displayed = True

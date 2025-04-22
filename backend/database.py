@@ -100,3 +100,7 @@ def retrieve_session_state(user_name, limit):
         return rows
     except Exception as e:
         logger.warning(f"Database error while retrieving session data: {e}") 
+        
+def clean_up_session(cur):
+    pass
+    

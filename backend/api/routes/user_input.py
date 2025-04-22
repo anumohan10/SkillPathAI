@@ -51,7 +51,7 @@ class ChatHistoryRequest(BaseModel):
 
 class ChatHistoryResponse(BaseModel):
     user_name: str
-    chat_history: str  # instead of List[ChatMessage]
+    state_data: str  # instead of List[ChatMessage]
     cur_timestamp: str
     source_page: str
     role: str
@@ -289,7 +289,7 @@ def fetch_recent_chats(user_name: str, limit: int = Query(5, ge=1, le=20)):
         logging.info("Data retrieved:", rows[:5])
         
         result = []
-        for chat_json, timestamp, source, role in rows:
+        for state_data, timestamp, source, role in rows:
             try:
                 # Parse stringified list of dicts
                 # messages = json.loads(chat_json) if isinstance(chat_json, str) else chat_json
@@ -298,7 +298,7 @@ def fetch_recent_chats(user_name: str, limit: int = Query(5, ge=1, le=20)):
 
                 result.append(ChatHistoryResponse(
                     user_name=user_name,
-                    chat_history=chat_json,
+                    state_data=state_data,
                     cur_timestamp=str(timestamp),
                     source_page=source,
                     role=role
