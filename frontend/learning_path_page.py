@@ -25,28 +25,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__) # Use __name__ for logger
 now = datetime.now()
 
-def save_chat_history_api(user_name, chat_history, cur_timestamp, source_page, role):
-    """Save chat history to the database."""
-    import requests
-    import logging
-
-    logger = logging.getLogger(__name__)
+def save_session_state_api(user_name, session_state, cur_timestamp, source_page, role):
+    """Save session state to the database."""
     try:
-        payload = {
-            "user_name": user_name,
-            "chat_history": chat_history,  
-            "cur_timestamp": cur_timestamp,
-            "source_page": source_page,
-            "role": role
-        }
-        response = requests.post("http://localhost:8000/user-input/chat-history", json=payload)
-
-        if response.status_code == 200 or response.status_code == 201:
-            logger.info("Chat history saved successfully")
+        # Call the API endpoint to save session state
+        response = requests.post(
+            "http://localhost:8000/user-input/chat-history",
+            json={
+                "user_name": user_name,
+                "session_state": session_state, 
+                "timestamp": cur_timestamp,
+                "source_page": source_page,
+                "role": role
+            }
+        )
+        if response.status_code == 200:
+            logger.info("Chat/session data saved successfully")
         else:
-            logger.error(f"Failed to save chat history: {response.status_code} | {response.text}")
+            logger.error(f"Failed to save chat/session data: {response.status_code} | {response.text}")
     except Exception as e:
-        logger.error(f"Error saving chat history: {str(e)}", exc_info=True)
+        logger.error(f"Error saving chat/session data: {str(e)}", exc_info=True)
 
 def get_top_skills_for_role_api(target_role):
     """Call the API to get top skills for a role."""
@@ -178,9 +176,9 @@ def render_learning_path_page(): # Renamed function
         st.session_state.current_page = "Guidance Hub"
         # Save chat history before clearing
         if 'lp_messages' in st.session_state and len(st.session_state.lp_messages) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history_api(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=st.session_state.lp_messages,
+                session_state=st.session_state.to_dict(),
                 cur_timestamp=st.session_state.cur_timestamp,
                 source_page="learning_path",
                 role=st.session_state.lp_data.get("target_role", "Unknown Role")
@@ -471,9 +469,9 @@ def render_learning_path_page(): # Renamed function
                 add_message("assistant", "Let's start fresh with a new learning path analysis!")
                 # Save chat history before resetting
                 if st.session_state.get('results_displayed', False):
-                    save_chat_history_api(
+                    save_session_state_api(
                         user_name=st.session_state.get("username", "User"),
-                        chat_history=st.session_state.lp_messages,
+                        session_state=st.session_state.to_dict(),
                         cur_timestamp=st.session_state.cur_timestamp,
                         source_page="learning_path",
                         role=st.session_state.lp_data.get("target_role", "Unknown Role")
@@ -532,11 +530,10 @@ def render_learning_path_page(): # Renamed function
         logger.info("User initiated learning path reset from sidebar button.")
         # Save chat history before resetting
         if len(st.session_state.get("lp_messages", [])) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history_api(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=st.session_state.lp_messages,
-                cur_timestamp=st.session_state.cur_timestamp,
-                source_page="learning_path",
+                session_state=st.session_state.to_dict(),
+                cur_timestamp=st.session_state.cur_timestampsource_page="learning_path",
                 role=st.session_state.lp_data.get("target_role", "Unknown Role")
             )
             logger.info("Saved chat history on sidebar restart (results were displayed)")
@@ -554,9 +551,9 @@ def render_learning_path_page(): # Renamed function
         st.session_state.current_page = "Dashboard"
         # Save chat history
         if st.session_state.get('results_displayed', False):
-            save_chat_history_api(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=st.session_state.lp_messages,
+                session_state=st.session_state.to_dict(),
                 cur_timestamp=st.session_state.cur_timestamp,
                 source_page="learning_path",
                 role=st.session_state.lp_data.get("target_role", "Unknown Role")

@@ -53,8 +53,8 @@ def create_resumes_table():
             cur.close()
             conn.close()
 
-def save_chat_history(user_name, chat_history, cur_timestamp, source_page):
-    """Save chat history to Snowflake."""
+def save_session_state(user_name, session_state, cur_timestamp, source_page, role):
+    """Save session state to Snowflake."""
     conn = get_snowflake_connection()
     if conn:
         try:
@@ -69,10 +69,10 @@ def save_chat_history(user_name, chat_history, cur_timestamp, source_page):
             # """
             # cur.execute(create_table_query)
             insert_query = """
-            INSERT INTO chat_history (user_name, chat_history, cur_timestamp, source_page)
-            VALUES (%s, %s, %s, %s);
+            INSERT INTO chat_history (user_name, chat_history, cur_timestamp, source_page, role)
+            VALUES (%s, %s, %s, %s, %s);
             """
-            cur.execute(insert_query, (user_name, json.dumps(chat_history), cur_timestamp, source_page))
+            cur.execute(insert_query, (user_name, session_state, cur_timestamp, source_page, role))
             conn.commit()
             logger.info("✅ Chat history saved to Snowflake.")
             return True, "Chat history saved successfully"
@@ -82,3 +82,21 @@ def save_chat_history(user_name, chat_history, cur_timestamp, source_page):
         finally:
             cur.close()
             conn.close()
+            
+def retrieve_session_state(user_name, limit):
+    try:
+        conn = get_snowflake_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT chat_history, cur_timestamp, source_page, role
+            FROM chat_history
+            WHERE user_name = %s
+            ORDER BY cur_timestamp DESC
+            LIMIT %s
+        """, (user_name, limit))
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.warning(f"Database error while retrieving session data: {e}") 

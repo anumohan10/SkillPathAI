@@ -5,22 +5,13 @@ import json
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import requests
 
 # Ensure backend services can be imported
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import backend services
-from backend.services.resume_parser import extract_text
-from backend.services.chat_service import ChatService
-from backend.services.career_transition_service import (
-    get_latest_resume_by_user_role,
-    process_missing_skills,
-    store_career_analysis,
-    get_career_transition_courses,
-    format_transition_plan
-)
-from backend.services.skill_matcher import extract_skills_from_text
-from backend.database import create_resumes_table, save_chat_history 
+from frontend.ui_service import format_transition_plan
 
 # Set up logging
 logging.basicConfig(
@@ -33,6 +24,274 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 now = datetime.now()
+
+# Define API URL - should be configurable in production
+API_URL = "http://localhost:8000"
+
+# Custom JSON encoder to handle non-serializable objects
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, pd.DataFrame):
+            return obj.to_dict('records')
+        elif isinstance(obj, pd.Series):
+            return obj.to_dict()
+        elif isinstance(obj, (pd.Timestamp, datetime)):
+            return obj.isoformat()
+        elif hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        return str(obj)
+
+def save_session_state_api(user_name, session_state_data, cur_timestamp):
+    """Save entire session state data via API instead of direct function call."""
+    try:
+        logger.info(f"Type of session state data: {type(session_state_data)}")
+        
+        # Convert to JSON string for API using the custom encoder
+        session_state_json = json.dumps(session_state_data, cls=CustomJSONEncoder)
+        
+        # Call the API endpoint to save session state data
+        logger.info(f"Session state data: {session_state_json[:100]}...")  # Log only first 100 chars
+        
+        response = requests.post(
+            f"{API_URL}/user-input/save-session-state",
+            json={
+                "user_name": user_name,
+                "session_state": session_state_json,  # Send as JSON string
+                "timestamp": cur_timestamp
+            }
+        )
+        
+        if response.status_code == 200:
+            logger.info("Session state data saved successfully via API")
+            return True
+        else:
+            logger.error(f"API error saving session state data: {response.status_code}")
+            return False
+    except Exception as e:
+        logger.error(f"Error calling session state API: {str(e)}")
+        return False
+
+def extract_resume_text_api(file):
+    """Extract text from a resume file using the API."""
+    try:
+        # Prepare the file for upload
+        files = {"file": (file.name, file, file.type)}
+        
+        # Call the API endpoint
+        response = requests.post(
+            f"{API_URL}/user-input/resume/extract",
+            files=files
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info("Resume text extracted successfully via API")
+                return data.get("text", "")
+            else:
+                logger.warning(f"API returned failure: {data.get('message')}")
+                return ""
+        else:
+            logger.error(f"API error extracting resume text: {response.status_code}")
+            return ""
+    except Exception as e:
+        logger.error(f"Error calling resume extraction API: {str(e)}")
+        return ""
+
+def extract_skills_api(resume_text):
+    """Extract skills from resume text using the API."""
+    try:
+        # Call the API endpoint
+        response = requests.post(
+            f"{API_URL}/user-input/skills/extract",
+            json={"resume_text": resume_text}
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info(f"Successfully extracted {len(data['skills'])} skills via API")
+                return data.get("skills", [])
+            else:
+                logger.warning(f"API returned failure: {data.get('message')}")
+                return []
+        else:
+            logger.error(f"API error extracting skills: {response.status_code}")
+            return []
+    except Exception as e:
+        logger.error(f"Error calling skills extraction API: {str(e)}")
+        return []
+
+def extract_skills_regex_api(resume_text):
+    """Extract skills from resume text using regex via the API."""
+    try:
+        # Call the API endpoint
+        response = requests.post(
+            f"{API_URL}/user-input/skills/extract-regex",
+            json={"resume_text": resume_text}
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info(f"Successfully extracted {len(data['skills'])} skills via regex API")
+                return data.get("skills", [])
+            else:
+                logger.warning(f"API returned failure: {data.get('message')}")
+                return []
+        else:
+            logger.error(f"API error extracting skills with regex: {response.status_code}")
+            return []
+    except Exception as e:
+        logger.error(f"Error calling skills regex extraction API: {str(e)}")
+        return []
+
+def process_missing_skills_api(extracted_skills, target_role):
+    """Process missing skills for a target role using the API."""
+    try:
+        # Call the API endpoint
+        response = requests.post(
+            f"{API_URL}/user-input/skills/missing",
+            json={
+                "extracted_skills": extracted_skills,
+                "target_role": target_role
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info(f"Successfully identified {len(data['missing_skills'])} missing skills via API")
+                return data.get("missing_skills", [])
+            else:
+                logger.warning(f"API returned failure: {data.get('message')}")
+                return []
+        else:
+            logger.error(f"API error processing missing skills: {response.status_code}")
+            return []
+    except Exception as e:
+        logger.error(f"Error calling missing skills API: {str(e)}")
+        return []
+
+def store_career_analysis_api(username, resume_text, extracted_skills, target_role, missing_skills):
+    """Store career analysis data using the API."""
+    try:
+        # Call the API endpoint
+        response = requests.post(
+            f"{API_URL}/user-input/career-analysis/store",
+            json={
+                "username": username,
+                "resume_text": resume_text,
+                "extracted_skills": extracted_skills,
+                "target_role": target_role,
+                "missing_skills": missing_skills
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info(f"Successfully stored career analysis, ID: {data.get('resume_id')}")
+                return data.get("resume_id")
+            else:
+                logger.warning(f"API returned failure: {data.get('message')}")
+                return None
+        else:
+            logger.error(f"API error storing career analysis: {response.status_code}")
+            return None
+    except Exception as e:
+        logger.error(f"Error calling career analysis storage API: {str(e)}")
+        return None
+
+def get_career_transition_courses_api(target_role, missing_skills, limit=6):
+    """Get career transition courses using the API."""
+    try:
+        # Call the API endpoint
+        response = requests.post(
+            f"{API_URL}/user-input/career-courses",
+            json={
+                "target_role": target_role,
+                "missing_skills": missing_skills,
+                "limit": limit
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info(f"Successfully retrieved {data.get('count', 0)} courses via API")
+                return data
+            else:
+                logger.warning(f"API returned failure: {data.get('message')}")
+                return {"courses": [], "count": 0}
+        else:
+            logger.error(f"API error getting career transition courses: {response.status_code}")
+            return {"courses": [], "count": 0}
+    except Exception as e:
+        logger.error(f"Error calling career transition courses API: {str(e)}")
+        return {"courses": [], "count": 0}
+
+def format_transition_plan_api(username, current_skills, target_role, missing_skills, courses):
+    """Format transition plan using the API."""
+    try:
+        # Call the API endpoint
+        response = requests.post(
+            f"{API_URL}/user-input/transition-plan",
+            json={
+                "username": username,
+                "current_skills": current_skills,
+                "target_role": target_role,
+                "missing_skills": missing_skills,
+                "courses": courses
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info("Successfully formatted transition plan via API")
+                return data
+            else:
+                logger.warning(f"API returned failure: {data.get('message')}")
+                return None
+        else:
+            logger.error(f"API error formatting transition plan: {response.status_code}")
+            return None
+    except Exception as e:
+        logger.error(f"Error calling transition plan API: {str(e)}")
+        return None
+
+def answer_career_question_api(question, user_context):
+    """Answer a career-related question using the API."""
+    try:
+        # Call the API endpoint
+        response = requests.post(
+            f"{API_URL}/user-input/career-question",
+            json={
+                "question": question,
+                "user_context": user_context
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                logger.info("Successfully received answer from career question API")
+                return data.get("response", "")
+            else:
+                logger.warning(f"API returned failure: {data.get('message')}")
+                return "I'm having trouble answering your question right now. Please try asking in a different way."
+        elif response.status_code == 503:
+            # Service unavailable - extract error message from response
+            error_detail = response.json().get("detail", "Unknown error")
+            logger.error(f"Service unavailable: {error_detail}")
+            return f"I'm having trouble answering your question right now: {error_detail}"
+        else:
+            logger.error(f"API error answering career question: {response.status_code}")
+            return "I'm having trouble answering your question right now. Please try again later."
+    except Exception as e:
+        logger.error(f"Error calling career question API: {str(e)}")
+        return "I'm having trouble connecting to the service right now. Please try again later."
 
 def render_career_transition_page(): # Renamed function
     """Main function for the Career Transition feature with resume analysis."""
@@ -50,12 +309,10 @@ def render_career_transition_page(): # Renamed function
         st.session_state.current_page = "Guidance Hub"
         # Save chat history before clearing
         if 'ct_messages' in st.session_state and len(st.session_state.ct_messages) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.ct_messages),
-                cur_timestamp=st.session_state.cur_timestamp,
-                source_page="learning_path",
-                role=st.session_state.lp_data.get("target_role", "Unknown Role")
+                session_state_data=st.session_state.to_dict(),
+                cur_timestamp=st.session_state.cur_timestamp
             )
             logger.info("Saved chat history on navigation back (results were displayed)")
         else:
@@ -133,7 +390,8 @@ def render_career_transition_page(): # Renamed function
         if uploaded_file:
             with st.spinner("Analyzing your resume..."):
                 try:
-                    resume_text = extract_text(uploaded_file)
+                    # Use the API function instead of direct call
+                    resume_text = extract_resume_text_api(uploaded_file)
                     if not resume_text or len(resume_text) < 50:
                         add_message("assistant", "⚠️ I couldn't extract enough text from your resume. Please try uploading a different file.")
                         logger.warning(f"Insufficient text extracted from {uploaded_file.name}")
@@ -143,13 +401,14 @@ def render_career_transition_page(): # Renamed function
                     logger.info("Resume text extracted.")
 
                     try:
-                        chat_service = ChatService() # Initialize or get from session
-                        extracted_skills = chat_service.extract_skills(resume_text)
-                        logger.info("Skills extracted using LLM.")
+                        # Use the API function instead of direct call
+                        extracted_skills = extract_skills_api(resume_text)
+                        logger.info("Skills extracted using API.")
                     except Exception as e:
-                        logger.warning(f"LLM skill extraction failed: {e}. Falling back to regex.")
-                        extracted_skills = extract_skills_from_text(resume_text)
-                        logger.info("Skills extracted using regex fallback.")
+                        logger.warning(f"API skill extraction failed: {e}. Falling back to regex.")
+                        # Use the regex API function as fallback
+                        extracted_skills = extract_skills_regex_api(resume_text)
+                        logger.info("Skills extracted using regex API fallback.")
 
                     st.session_state.ct_data["extracted_skills"] = extracted_skills
                     add_message("user", f"*Uploaded resume: {uploaded_file.name}*")
@@ -222,17 +481,17 @@ def render_career_transition_page(): # Renamed function
 
                     skill_progress = st.progress(0.0, text="Identifying missing skills...")
                     debug_container.write("Identifying missing skills...")
-                    missing_skills = process_missing_skills(extracted_skills, target_role)
+                    # Use the API function instead of direct call
+                    missing_skills = process_missing_skills_api(extracted_skills, target_role)
                     st.session_state.ct_data["missing_skills"] = missing_skills
                     debug_container.success(f"Identified {len(missing_skills)} missing skills: {missing_skills}")
                     logger.info(f"Identified {len(missing_skills)} missing skills.")
 
                     skill_progress.progress(0.3, text="Storing analysis results...")
                     debug_container.write("Storing career analysis data...")
-                    # Ensure store_career_analysis is robust and returns an ID or handles errors
+                    # Use the API function instead of direct call
                     try:
-                        # Assuming store_career_analysis is the correct function now
-                        resume_id = store_career_analysis(
+                        resume_id = store_career_analysis_api(
                             username=name,
                             resume_text=resume_text,
                             extracted_skills=extracted_skills,
@@ -250,19 +509,20 @@ def render_career_transition_page(): # Renamed function
                     skill_progress.progress(0.6, text="Searching for relevant courses...")
                     debug_container.write("Getting course recommendations...")
                     try:
-                         courses_result = get_career_transition_courses(
-                             target_role=target_role,
-                             missing_skills=missing_skills
-                         )
-                         if courses_result and courses_result.get("count", 0) > 0:
+                        # Use the API function instead of direct call
+                        courses_result = get_career_transition_courses_api(
+                            target_role=target_role,
+                            missing_skills=missing_skills
+                        )
+                        if courses_result and courses_result.get("count", 0) > 0:
                             courses_df = pd.DataFrame(courses_result["courses"])
                             debug_container.success(f"Found {len(courses_df)} course recommendations.")
                             logger.info(f"Found {len(courses_df)} courses.")
                             st.session_state.ct_data["courses"] = courses_df
-                         else:
-                             debug_container.warning("No courses found for missing skills.")
-                             logger.warning("No courses found for missing skills.")
-                             st.session_state.ct_data["courses"] = pd.DataFrame()
+                        else:
+                            debug_container.warning("No courses found for missing skills.")
+                            logger.warning("No courses found for missing skills.")
+                            st.session_state.ct_data["courses"] = pd.DataFrame()
                     except Exception as e:
                         logger.error(f"Failed to get courses: {e}", exc_info=True)
                         debug_container.error(f"Failed to get courses: {e}")
@@ -317,7 +577,8 @@ def render_career_transition_page(): # Renamed function
 
             # Use formatting function for consistent UI
             try:
-                transition_plan = format_transition_plan(
+                # Use the API function instead of direct call
+                transition_plan = format_transition_plan_api(
                     username=name,
                     current_skills=extracted_skills,
                     target_role=target_role,
@@ -325,17 +586,39 @@ def render_career_transition_page(): # Renamed function
                     courses=courses_list
                 )
 
-                add_message("assistant", transition_plan["skill_assessment"])
+                if transition_plan:
+                    add_message("assistant", transition_plan.get("skill_assessment", ""))
 
-                if transition_plan["has_valid_courses"]:
-                    full_message = transition_plan["introduction"] + transition_plan["course_recommendations"]
-                    add_message("assistant", full_message)
+                    if transition_plan.get("has_valid_courses", False):
+                        full_message = transition_plan.get("introduction", "") + transition_plan.get("course_recommendations", "")
+                        add_message("assistant", full_message)
+                    else:
+                        add_message("assistant", transition_plan.get("introduction", ""))
+                        add_message("assistant", "I couldn't find specific courses for your skill gaps. Try searching for courses related to the skills mentioned above on platforms like Coursera, Udemy, or LinkedIn Learning.")
+                        logger.warning("No valid courses found for transition plan display.")
+
+                    add_message("assistant", transition_plan.get("career_advice", ""))
                 else:
-                    add_message("assistant", transition_plan["introduction"])
-                    add_message("assistant", "I couldn't find specific courses for your skill gaps. Try searching for courses related to the skills mentioned above on platforms like Coursera, Udemy, or LinkedIn Learning.")
-                    logger.warning("No valid courses found for transition plan display.")
+                    # Fallback to direct formatting if API fails
+                    transition_plan = format_transition_plan(
+                        username=name,
+                        current_skills=extracted_skills,
+                        target_role=target_role,
+                        missing_skills=missing_skills,
+                        courses=courses_list
+                    )
+                    
+                    add_message("assistant", transition_plan["skill_assessment"])
 
-                add_message("assistant", transition_plan["career_advice"])
+                    if transition_plan["has_valid_courses"]:
+                        full_message = transition_plan["introduction"] + transition_plan["course_recommendations"]
+                        add_message("assistant", full_message)
+                    else:
+                        add_message("assistant", transition_plan["introduction"])
+                        add_message("assistant", "I couldn't find specific courses for your skill gaps. Try searching for courses related to the skills mentioned above on platforms like Coursera, Udemy, or LinkedIn Learning.")
+                        logger.warning("No valid courses found for transition plan display.")
+
+                    add_message("assistant", transition_plan["career_advice"])
 
             except Exception as e:
                  logger.error(f"Error formatting transition plan: {e}", exc_info=True)
@@ -366,9 +649,9 @@ def render_career_transition_page(): # Renamed function
                 add_message("assistant", "Let's start fresh with a new career transition analysis!")
                 # Save chat history before resetting
                 if st.session_state.get('results_displayed', False):
-                    save_chat_history(
+                    save_session_state_api(
                         user_name=st.session_state.get("username", "User"),
-                        chat_history=json.dumps(st.session_state.ct_messages),
+                        session_state_data=st.session_state.to_dict(),
                         cur_timestamp=st.session_state.cur_timestamp
                     )
                     logger.info("Saved chat history on restart via chat (results were displayed)")
@@ -393,8 +676,8 @@ def render_career_transition_page(): # Renamed function
                         # 'courses': st.session_state.lp_data.get("courses", pd.DataFrame()).to_dict('records')
                     }
 
-                    chat_service = ChatService() # Initialize here or use session state
-                    followup_response = chat_service.answer_career_question(user_input, user_context)
+                    # Use API instead of direct function call
+                    followup_response = answer_career_question_api(user_input, user_context)
                     add_message("assistant", followup_response)
                     logger.info("Generated follow-up response.")
                 except Exception as e:
@@ -424,9 +707,9 @@ def render_career_transition_page(): # Renamed function
         logger.info("User initiated career transition reset from sidebar button.")
         # Save chat history before resetting
         if len(st.session_state.get("ct_messages", [])) > 0 and st.session_state.get('results_displayed', False):
-            save_chat_history(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.ct_messages),
+                session_state_data=st.session_state.to_dict(),
                 cur_timestamp=st.session_state.cur_timestamp
             )
             logger.info("Saved chat history on sidebar restart (results were displayed)")
@@ -444,9 +727,9 @@ def render_career_transition_page(): # Renamed function
         st.session_state.current_page = "Dashboard"
         # Save chat history
         if st.session_state.get('results_displayed', False):
-            save_chat_history(
+            save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
-                chat_history=json.dumps(st.session_state.ct_messages),
+                session_state_data=st.session_state.to_dict(),
                 cur_timestamp=st.session_state.cur_timestamp
             )
             logger.info("Saved chat history on end chat (results were displayed)")

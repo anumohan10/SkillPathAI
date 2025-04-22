@@ -84,7 +84,7 @@ def process_missing_skills(extracted_skills: List[str], target_role: str) -> Lis
         )
         
         # Use a more comprehensive approach to get better results
-        response = chat_service.get_llm_response(prompt)
+        flag, response = chat_service.get_llm_response(prompt)
         
         # Check if response contains an error message
         if "having trouble" in response or "sorry" in response.lower() or "I can't" in response:
@@ -797,3 +797,11 @@ Do you have any questions about your career transition plan?
         "career_advice": career_advice,
         "has_valid_courses": has_valid_courses
     }
+
+# TODO: Refactor this function to remove hardcoded career advice.
+# This should be moved to a configuration file or database to make it:
+# 1. Role-specific (currently only shows data engineering advice)
+# 2. Easier to update without code changes
+# 3. Potentially personalized based on user's skill assessment
+# 4. Maybe format_transition_plan() needs to be moved to ui_service.py since it's not a service function.
+
