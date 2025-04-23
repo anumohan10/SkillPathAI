@@ -208,14 +208,16 @@ def render_learning_path_page(): # Renamed function
         st.session_state.current_page = "Guidance Hub"
         # Save chat history before clearing
         if 'lp_messages' in st.session_state and len(st.session_state.lp_messages) > 0 and st.session_state.get('results_displayed', False):
+            # Get the target role from session state before clearing
+            current_target_role = st.session_state.lp_data.get("target_role", "Unknown Role")
             save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
                 session_state_data=st.session_state.to_dict(),
                 cur_timestamp=st.session_state.cur_timestamp,
                 source_page="learning_path",
-                role=st.session_state.lp_data.get("target_role", "Unknown Role")
+                role=current_target_role
             )
-            logger.info(f"Saved chat history on navigation back (results were displayed) for role {target_role}")
+            logger.info(f"Saved chat history on navigation back (results were displayed) for role {current_target_role}")
         else:
             logger.info("No chat history to save on navigation back (results were not displayed)")
         # Clear specific states for this page if needed when going back
@@ -277,12 +279,27 @@ def render_learning_path_page(): # Renamed function
         debug_container.write("### Course Data")
         if "lp_data" in st.session_state and "courses" in st.session_state.lp_data:
             courses_df = st.session_state.lp_data["courses"]
-            if not courses_df.empty:
+            
+            # Check if courses_df is actually a DataFrame
+            if not isinstance(courses_df, pd.DataFrame):
+                debug_container.warning(f"courses_df is not a DataFrame, it's a {type(courses_df)}. Converting for display...")
+                try:
+                    # Only convert for display, don't modify session state here
+                    display_df = pd.DataFrame(courses_df)
+                    debug_container.write(f"Converted DataFrame shape: {display_df.shape}")
+                    debug_container.write(f"Columns: {list(display_df.columns)}")
+                    debug_container.dataframe(display_df)
+                except Exception as e:
+                    debug_container.error(f"Error converting to DataFrame: {str(e)}")
+                    debug_container.warning("Showing raw data instead:")
+                    debug_container.write(courses_df)
+            # Regular DataFrame case
+            elif not courses_df.empty:
                 debug_container.write(f"DataFrame shape: {courses_df.shape}")
                 debug_container.write(f"Columns: {list(courses_df.columns)}")
                 debug_container.dataframe(courses_df)
             else:
-                debug_container.warning("No courses DataFrame or DataFrame is empty")
+                debug_container.warning("Courses DataFrame is empty")
                 
                 # Show raw data if available
                 if "raw_courses" in st.session_state.lp_data:
@@ -353,28 +370,32 @@ def render_learning_path_page(): # Renamed function
             add_message("user", target_role)
             logger.info(f"Target role set: {target_role}. Fetching skills.")
 
-            with st.spinner("Identifying key skills for this role..."):
-                try:
-                    top_skills = get_top_skills_for_role_api(target_role)
-                    if not top_skills: # Handle case where no skills are found
-                        logger.warning(f"No top skills found for role: {target_role}")
-                        add_message("assistant", f"I couldn't find specific top skills for '{target_role}'. Let's try defining some key areas manually. What are 5 important skills or topics for this role?")
+            # Create columns for better spinner placement
+            skill_spinner_col1, skill_spinner_col2, skill_spinner_col3 = st.columns([1, 2, 1])
+            with skill_spinner_col2:
+                with st.spinner("🔍 Identifying key skills for this role..."):
+                    st.info(f"Please wait while we analyze the skills needed for a {target_role} role...")
+                    try:
+                        top_skills = get_top_skills_for_role_api(target_role)
+                        if not top_skills: # Handle case where no skills are found
+                            logger.warning(f"No top skills found for role: {target_role}")
+                            add_message("assistant", f"I couldn't find specific top skills for '{target_role}'. Let's try defining some key areas manually. What are 5 important skills or topics for this role?")
+                            st.session_state.lp_state = "manual_skills"
+                        else:
+                            st.session_state.lp_data["top_skills"] = top_skills
+                            st.session_state.lp_data["skill_ratings"] = {}
+                            st.session_state.lp_data["current_skill_index"] = 0
+
+                            skills_list = "\n".join([f"- {skill}" for skill in top_skills])
+                            add_message("assistant", f"Great! For a **{target_role}** role, these are the top skills you'll need:\n\n{skills_list}\n\nLet's assess your current skill level in each area.")
+                            st.session_state.lp_state = "rate_skills"
+                            logger.info(f"Found {len(top_skills)} skills for {target_role}. Moving to rate_skills state.")
+
+                    except Exception as e:
+                        logger.error(f"Error getting skills for {target_role}: {str(e)}", exc_info=True)
+                        debug_container.error(f"Error getting skills: {str(e)}")
+                        add_message("assistant", "I'm having trouble identifying key skills for this role right now. Let me help you build a more general learning path instead. What specific areas are you interested in learning about? (Please list 5)")
                         st.session_state.lp_state = "manual_skills"
-                    else:
-                        st.session_state.lp_data["top_skills"] = top_skills
-                        st.session_state.lp_data["skill_ratings"] = {}
-                        st.session_state.lp_data["current_skill_index"] = 0
-
-                        skills_list = "\n".join([f"- {skill}" for skill in top_skills])
-                        add_message("assistant", f"Great! For a **{target_role}** role, these are the top skills you'll need:\n\n{skills_list}\n\nLet's assess your current skill level in each area.")
-                        st.session_state.lp_state = "rate_skills"
-                        logger.info(f"Found {len(top_skills)} skills for {target_role}. Moving to rate_skills state.")
-
-                except Exception as e:
-                    logger.error(f"Error getting skills for {target_role}: {str(e)}", exc_info=True)
-                    debug_container.error(f"Error getting skills: {str(e)}")
-                    add_message("assistant", "I'm having trouble identifying key skills for this role right now. Let me help you build a more general learning path instead. What specific areas are you interested in learning about? (Please list 5)")
-                    st.session_state.lp_state = "manual_skills"
             st.rerun()
 
     # --- Manual Skills Entry --- #
@@ -466,60 +487,86 @@ def render_learning_path_page(): # Renamed function
             elif not st.session_state.lp_messages[-1]["content"].startswith("Thanks for the ratings!"):
                  add_message("assistant", "Thanks for the ratings! Now generating your personalized learning path...")
             
-            with st.spinner("Searching for the best courses..."):
-                target_role = st.session_state.lp_data.get("target_role", "Unknown Role")
-                user_id = None # Placeholder for user ID if needed by course service
+            # Display a spinner at the top of the page before doing processing
+            spinner_col1, spinner_col2, spinner_col3 = st.columns([1, 2, 1])
+            with spinner_col2:
+                with st.spinner("🔍 Searching for the best courses for you..."):
+                    st.info("Please wait while we find the perfect courses to help you build your skills. This may take a moment...")
+                    
+                    target_role = st.session_state.lp_data.get("target_role", "Unknown Role")
+                    user_id = None # Placeholder for user ID if needed by course service
 
-                # Store the learning path data first (optional, depends on whether ID is needed for courses)
-                try:
-                    debug_container.write("Storing learning path data...")
-                    store_result = store_skill_ratings_api(st.session_state.lp_data)
-                    if store_result:
-                        debug_container.success("Learning path stored successfully")
-                        # Get the ID from the stored data
-                        user_id = store_result
-                        debug_container.write(f"Using record ID: {user_id}")
-                    else:
-                        debug_container.warning("Learning path stored, but no ID returned.")
-                        logger.warning("Learning path stored, but no ID returned.")
-                except Exception as e:
-                    debug_container.error(f"Error saving learning path: {str(e)}")
-                    logger.error(f"Error saving learning path: {str(e)}", exc_info=True)
-                    user_id = None
-                    # Continue without stored ID
+                    # Store the learning path data first (optional, depends on whether ID is needed for courses)
+                    try:
+                        debug_container.write("Storing learning path data...")
+                        store_result = store_skill_ratings_api(st.session_state.lp_data)
+                        if store_result:
+                            debug_container.success("Learning path stored successfully")
+                            # Get the ID from the stored data
+                            user_id = store_result
+                            debug_container.write(f"Using record ID: {user_id}")
+                        else:
+                            debug_container.warning("Learning path stored, but no ID returned.")
+                            logger.warning("Learning path stored, but no ID returned.")
+                    except Exception as e:
+                        debug_container.error(f"Error saving learning path: {str(e)}")
+                        logger.error(f"Error saving learning path: {str(e)}", exc_info=True)
+                        user_id = None
+                        # Continue without stored ID
 
-                # Get recommended courses
-                try:
-                    debug_container.write("Fetching course recommendations...")
-                    courses = get_course_recommendations_api(target_role, user_id)
-                    debug_container.success(f"Retrieved {len(courses)} course recommendations.")
-                    logger.info(f"Retrieved {len(courses)} course recommendations for role '{target_role}'.")
-                    
-                    # Log the raw course data to debug
-                    logger.info(f"Raw courses data: {courses[:1]}")
-                    
-                    # Make sure we have a proper DataFrame
-                    if isinstance(courses, pd.DataFrame):
-                        courses_df = courses
-                    else:
-                        # Convert list of dicts to DataFrame
-                        try:
-                            courses_df = pd.DataFrame(courses)
-                            logger.info(f"Converted courses to DataFrame with columns: {list(courses_df.columns)}")
-                        except Exception as e:
-                            logger.error(f"Error converting courses to DataFrame: {e}", exc_info=True)
-                            courses_df = pd.DataFrame()
-                    
-                    # Store in session state
-                    st.session_state.lp_data["courses"] = courses_df
-                    
-                    # Store raw data too for debugging
-                    st.session_state.lp_data["raw_courses"] = courses
-                except Exception as e:
-                    debug_container.error(f"Error retrieving courses: {str(e)}")
-                    logger.error(f"Error retrieving courses for role '{target_role}': {str(e)}", exc_info=True)
-                    st.session_state.lp_data["courses"] = pd.DataFrame() # Store empty DataFrame
-                    add_message("assistant", "Sorry, I encountered an error while searching for courses. I can still provide general advice.")
+                    # Get recommended courses
+                    try:
+                        debug_container.write("Fetching course recommendations...")
+                        courses = get_course_recommendations_api(target_role, user_id)
+                        
+                        # First store the raw data for fallback
+                        st.session_state.lp_data["raw_courses"] = courses
+                        
+                        # Check what we got from the API
+                        if courses:
+                            debug_container.success(f"Retrieved {len(courses)} course recommendations.")
+                            logger.info(f"Retrieved {len(courses)} course recommendations for role '{target_role}'.")
+                            logger.info(f"Courses data type: {type(courses)}")
+                            
+                            # Log detailed info about courses for each level category
+                            level_counts = {}
+                            for course in courses:
+                                level = course.get('LEVEL_CATEGORY', 'UNKNOWN')
+                                level_counts[level] = level_counts.get(level, 0) + 1
+                            
+                            logger.info(f"Course level distribution: {level_counts}")
+                            logger.info(f"Full courses data: {json.dumps(courses)}")
+                            
+                            # Log the raw course data to debug
+                            logger.info(f"Raw courses data sample: {str(courses[:1])[:200]}...")
+                            
+                            # Make sure we have a proper DataFrame
+                            if isinstance(courses, pd.DataFrame):
+                                courses_df = courses
+                                logger.info("API returned courses as DataFrame directly")
+                            else:
+                                # Convert list of dicts to DataFrame
+                                try:
+                                    courses_df = pd.DataFrame(courses)
+                                    logger.info(f"Successfully converted courses to DataFrame with shape {courses_df.shape}")
+                                    logger.info(f"DataFrame columns: {list(courses_df.columns)}")
+                                except Exception as e:
+                                    logger.error(f"Error converting courses to DataFrame: {e}", exc_info=True)
+                                    debug_container.error(f"Error converting to DataFrame: {str(e)}")
+                                    # Create empty DataFrame as fallback
+                                    courses_df = pd.DataFrame()
+                        else:
+                            logger.warning("API returned empty or null courses data")
+                            debug_container.warning("No courses received from API")
+                            courses_df = pd.DataFrame()  # Create empty DataFrame
+                        
+                        # Store in session state (even if empty)
+                        st.session_state.lp_data["courses"] = courses_df
+                    except Exception as e:
+                        debug_container.error(f"Error retrieving courses: {str(e)}")
+                        logger.error(f"Error retrieving courses for role '{target_role}': {str(e)}", exc_info=True)
+                        st.session_state.lp_data["courses"] = pd.DataFrame() # Store empty DataFrame
+                        add_message("assistant", "Sorry, I encountered an error while searching for courses. I can still provide general advice.")
 
             # Move to display state regardless of course fetching success
             st.session_state.lp_state = "display_results"
@@ -538,76 +585,95 @@ def render_learning_path_page(): # Renamed function
     elif current_lp_state == "display_results":
         logger.info("Inside 'display_results' state block.")
         if "results_displayed" not in st.session_state:
-            logger.info("Displaying learning path results for the first time.")
-            # Get personalized data
-            name = st.session_state.lp_data.get("name", "User")
-            target_role = st.session_state.lp_data.get("target_role", "your chosen role")
-            skill_ratings = st.session_state.lp_data.get("skill_ratings", {})
-            courses_df = st.session_state.lp_data.get("courses", pd.DataFrame())
-
-            # Add Skill Assessment section
-            skill_assessment = format_skills_for_display(skill_ratings)
-            add_message("assistant", skill_assessment)
-
-            # Format and display Intro + Course Recommendations
-            try:
-                intro = format_introduction(target_role, skill_ratings)
-                
-                # Debug what's in the session state
-                raw_courses = st.session_state.lp_data.get("raw_courses", [])
-                logger.info(f"Debug - raw_courses in session state: {len(raw_courses)} items")
-                
-                # Try with raw courses data if DataFrame is empty
-                if courses_df.empty and raw_courses:
-                    logger.warning("courses_df is empty but raw_courses exists, trying direct use of raw data")
-                    # Create a simplified course message directly from raw data
-                    course_msg = "# 📋 Learning Path\n\n"
-                    course_msg += "# 📚 Course Recommendations\n\n"
+            # Show spinner while formatting results
+            results_spinner_col1, results_spinner_col2, results_spinner_col3 = st.columns([1, 2, 1])
+            with results_spinner_col2:
+                with st.spinner("📊 Creating your personalized learning path..."):
+                    st.info("Formatting your personalized learning path with courses tailored to your skill levels...")
                     
-                    for course in raw_courses:
-                        course_name = course.get('COURSE_NAME', course.get('course_name', 'Unknown Course'))
-                        course_url = course.get('URL', course.get('url', '#'))
-                        course_description = course.get('DESCRIPTION', course.get('description', 'No description available'))
+                    logger.info("Displaying learning path results for the first time.")
+                    # Get personalized data
+                    name = st.session_state.lp_data.get("name", "User")
+                    target_role = st.session_state.lp_data.get("target_role", "your chosen role")
+                    skill_ratings = st.session_state.lp_data.get("skill_ratings", {})
+                    courses_df = st.session_state.lp_data.get("courses", pd.DataFrame())
+
+                    # Add Skill Assessment section
+                    skill_assessment = format_skills_for_display(skill_ratings)
+                    add_message("assistant", skill_assessment)
+
+                    # Format and display Intro + Course Recommendations
+                    try:
+                        intro = format_introduction(target_role, skill_ratings)
                         
-                        course_msg += f"### {course_name}\n\n"
-                        course_msg += f"**What you'll learn**:\n\n{course_description[:300]}...\n\n"
-                        course_msg += f"**[➡️ Enroll in this course]({course_url})**\n\n"
-                        course_msg += "---\n\n"
-                    
-                    has_valid_courses = bool(raw_courses)
-                else:
-                    logger.info(f"Formatting courses with DataFrame of shape: {courses_df.shape}")
-                    course_msg, has_valid_courses = format_course_message(courses_df, target_role)
-                
-                # Display with what we have
-                logger.info(f"Course formatting result: has_valid_courses={has_valid_courses}")
-                if has_valid_courses:
-                    logger.info("Adding full message with courses to the chat")
-                    full_message = intro + course_msg
-                    add_message("assistant", full_message)
-                else:
-                    logger.info("No valid courses, adding intro and error message separately")
-                    add_message("assistant", intro) # Show intro even if no courses
-                    add_message("assistant", "I couldn't find specific courses for your skill gaps. Consider searching for courses related to your rated skills on platforms like Coursera, Udemy, or LinkedIn Learning.")
-                    logger.warning("No valid courses found to display.")
-                    
-                    # Added explicit debug for troubleshooting
-                    debug_container.warning("⚠️ No courses could be displayed. Check the logs for details.")
-                    debug_container.write(f"Raw courses data: {raw_courses}")
-                    
-            except Exception as e:
-                logger.error(f"Error formatting courses for display: {str(e)}", exc_info=True)
-                # Ensure we at least show something in case of error
-                add_message("assistant", intro)
-                add_message("assistant", "I encountered an error while formatting your course recommendations. Please try again later.")
-                
-                # Add debug information to the debug container
-                debug_container.error(f"Error formatting courses: {str(e)}")
-                debug_container.write("Stack trace:", exc_info=True)
+                        # Debug what's in the session state
+                        raw_courses = st.session_state.lp_data.get("raw_courses", [])
+                        logger.info(f"Debug - raw_courses in session state: {len(raw_courses)} items")
+                        
+                        # Ensure courses_df is actually a DataFrame
+                        if not isinstance(courses_df, pd.DataFrame):
+                            logger.warning(f"courses_df is not a DataFrame, it's a {type(courses_df)}. Converting it now.")
+                            try:
+                                courses_df = pd.DataFrame(courses_df)
+                                logger.info(f"Successfully converted to DataFrame with shape: {courses_df.shape}")
+                            except Exception as e:
+                                logger.error(f"Error converting courses_df to DataFrame: {str(e)}", exc_info=True)
+                                courses_df = pd.DataFrame()  # Create empty DataFrame as fallback
+                            
+                            # Update the session state with the converted DataFrame
+                            st.session_state.lp_data["courses"] = courses_df
+                        
+                        # Try with raw courses data if DataFrame is empty
+                        if courses_df.empty and raw_courses:
+                            logger.warning("courses_df is empty but raw_courses exists, trying direct use of raw data")
+                            # Create a simplified course message directly from raw data
+                            course_msg = "# 📋 Learning Path\n\n"
+                            course_msg += "# 📚 Course Recommendations\n\n"
+                            
+                            for course in raw_courses:
+                                course_name = course.get('COURSE_NAME', course.get('course_name', 'Unknown Course'))
+                                course_url = course.get('URL', course.get('url', '#'))
+                                course_description = course.get('DESCRIPTION', course.get('description', 'No description available'))
+                                
+                                course_msg += f"### {course_name}\n\n"
+                                course_msg += f"**What you'll learn**:\n\n{course_description[:300]}...\n\n"
+                                course_msg += f"**[➡️ Enroll in this course]({course_url})**\n\n"
+                                course_msg += "---\n\n"
+                            
+                            has_valid_courses = bool(raw_courses)
+                        else:
+                            logger.info(f"Formatting courses with DataFrame of shape: {courses_df.shape}")
+                            course_msg, has_valid_courses = format_course_message(courses_df, target_role)
+                        
+                        # Display with what we have
+                        logger.info(f"Course formatting result: has_valid_courses={has_valid_courses}")
+                        if has_valid_courses:
+                            logger.info("Adding full message with courses to the chat")
+                            full_message = intro + course_msg
+                            add_message("assistant", full_message)
+                        else:
+                            logger.info("No valid courses, adding intro and error message separately")
+                            add_message("assistant", intro) # Show intro even if no courses
+                            add_message("assistant", "I couldn't find specific courses for your skill gaps. Consider searching for courses related to your rated skills on platforms like Coursera, Udemy, or LinkedIn Learning.")
+                            logger.warning("No valid courses found to display.")
+                            
+                            # Added explicit debug for troubleshooting
+                            debug_container.warning("⚠️ No courses could be displayed. Check the logs for details.")
+                            debug_container.write(f"Raw courses data: {raw_courses}")
+                            
+                    except Exception as e:
+                        logger.error(f"Error formatting courses for display: {str(e)}", exc_info=True)
+                        # Ensure we at least show something in case of error
+                        add_message("assistant", intro)
+                        add_message("assistant", "I encountered an error while formatting your course recommendations. Please try again later.")
+                        
+                        # Add debug information to the debug container
+                        debug_container.error(f"Error formatting courses: {str(e)}")
+                        debug_container.write("Stack trace:", exc_info=True)
 
-            # Add Career Advice with LLM
-            career_advice = format_career_advice(target_role=target_role, skill_ratings=skill_ratings)
-            add_message("assistant", career_advice)
+                    # Add Career Advice with LLM
+                    career_advice = format_career_advice(target_role=target_role, skill_ratings=skill_ratings)
+                    add_message("assistant", career_advice)
 
             # Mark results as displayed to prevent re-adding messages on rerun
             st.session_state.results_displayed = True
@@ -621,23 +687,14 @@ def render_learning_path_page(): # Renamed function
             # Check if user wants to restart
             if user_input.lower() in ['restart', 'start over', 'reset']:
                 add_message("assistant", "Let's start fresh with a new learning path analysis!")
-                # Save chat history before resetting
-                if st.session_state.get('results_displayed', False):
-                    save_session_state_api(
-                        user_name=st.session_state.get("username", "User"),
-                        session_state_data=st.session_state.to_dict(),
-                        cur_timestamp=st.session_state.cur_timestamp,
-                        source_page="learning_path",
-                        role=st.session_state.lp_data.get("target_role", "Unknown Role")
-                    )
-                    logger.info(f"Saved chat history on restart via chat (results were displayed) for role {target_role}")
-                # Reset session state
+                # Simply reset the session state without saving
                 st.session_state.lp_state = "ask_name"
                 st.session_state.lp_messages = []
                 st.session_state.lp_data = {}
                 st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
                 if "results_displayed" in st.session_state:
                     del st.session_state.results_displayed
+                logger.info("Reset learning path session for new analysis through chat interface")
                 st.rerun()
             
             logger.info(f"User asked follow-up question: {user_input}")
@@ -682,23 +739,14 @@ def render_learning_path_page(): # Renamed function
     st.sidebar.header("Chat Controls")
     if st.sidebar.button("🔄 Restart Analysis"):
         logger.info("User initiated learning path reset from sidebar button.")
-        # Save chat history before resetting
-        if len(st.session_state.get("lp_messages", [])) > 0 and st.session_state.get('results_displayed', False):
-            save_session_state_api(
-                user_name=st.session_state.get("username", "User"),
-                session_state_data=st.session_state.to_dict(),
-                cur_timestamp=st.session_state.cur_timestamp,
-                source_page="learning_path",
-                role=st.session_state.lp_data.get("target_role", "Unknown Role")
-            )
-            logger.info(f"Saved chat history on sidebar restart (results were displayed) for role {target_role}")
-        # Reset chat state
+        # Simply reset the session state without saving
         st.session_state.lp_state = "ask_name"
         st.session_state.lp_messages = []
         st.session_state.lp_data = {}
         st.session_state.cur_timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
         if "results_displayed" in st.session_state:
             del st.session_state.results_displayed
+        logger.info("Reset learning path session for new analysis")
         st.rerun()
         
     if st.sidebar.button("⏹️ End Chat"):
@@ -706,14 +754,16 @@ def render_learning_path_page(): # Renamed function
         st.session_state.current_page = "Dashboard"
         # Save chat history
         if st.session_state.get('results_displayed', False):
+            # Get the target role from session state before clearing
+            current_target_role = st.session_state.lp_data.get("target_role", "Unknown Role")
             save_session_state_api(
                 user_name=st.session_state.get("username", "User"),
                 session_state_data=st.session_state.to_dict(),
                 cur_timestamp=st.session_state.cur_timestamp,
                 source_page="learning_path",
-                role=st.session_state.lp_data.get("target_role", "Unknown Role")
+                role=current_target_role
             )
-            logger.info(f"Saved chat history on end chat (results were displayed) for role {target_role}")
+            logger.info(f"Saved chat history on end chat (results were displayed) for role {current_target_role}")
         # Clear specific states for this page
         for key in ['lp_state', 'lp_messages', 'lp_data', 'results_displayed', 'cur_timestamp']:
             st.session_state.pop(key, None)

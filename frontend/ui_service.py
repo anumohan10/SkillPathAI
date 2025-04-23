@@ -21,6 +21,29 @@ def format_course_message(courses_df, target_role):
     import logging
     logger = logging.getLogger(__name__)
     
+    # Add detailed debugging for all courses
+    logger.info("=== COURSE DATA DEBUG START ===")
+    logger.info(f"Target role: {target_role}")
+    
+    try:
+        # Convert DataFrame to records for easier debugging
+        if isinstance(courses_df, pd.DataFrame):
+            courses_records = courses_df.to_dict('records')
+            logger.info(f"DataFrame has {len(courses_records)} records")
+            
+            # Check level categories - focus on what we're looking for
+            advanced_courses = [c for c in courses_records if c.get('LEVEL_CATEGORY') == 'ADVANCED']
+            logger.info(f"Found {len(advanced_courses)} ADVANCED courses in data")
+            if advanced_courses:
+                for i, course in enumerate(advanced_courses):
+                    logger.info(f"ADVANCED course {i+1}: {course.get('COURSE_NAME', 'No name')}")
+        else:
+            logger.warning(f"courses_df is not a DataFrame: {type(courses_df)}")
+    except Exception as e:
+        logger.error(f"Error during debug logging: {e}")
+    
+    logger.info("=== COURSE DATA DEBUG END ===")
+    
     # Debug logging to see what we're working with
     logger.info(f"Formatting courses: DataFrame has {len(courses_df)} rows")
     logger.info(f"DataFrame columns: {list(courses_df.columns)}")
@@ -66,6 +89,9 @@ def format_course_message(courses_df, target_role):
             
             if not level_courses.empty:
                 logger.info(f"Found {len(level_courses)} courses for level {level}")
+                # Log the actual course details for debugging
+                for i, (_, course) in enumerate(level_courses.iterrows()):
+                    logger.info(f"Level {level} - Course {i+1}: {course.get(course_name_col, 'No Name')} [{course.get(level_category_col, 'No Category')}]")
                 level_title_added = False
                 
                 for _, course in level_courses.iterrows():

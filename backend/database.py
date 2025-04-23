@@ -22,6 +22,7 @@ def get_snowflake_connection():
             database=os.getenv("SNOWFLAKE_DATABASE"),
             schema=os.getenv("SNOWFLAKE_SCHEMA"),
         )
+        logger.info("Env_Variable:\n", os.getenv("SNOWFLAKE_USER"),os.getenv("SNOWFLAKE_ACCOUNT"), os.getenv("SNOWFLAKE_ROLE"), os.getenv("SNOWFLAKE_WAREHOUSE"), os.getenv("SNOWFLAKE_DATABASE"),os.getenv("SNOWFLAKE_SCHEMA"))
         return conn
     except Exception as e:
         logger.error(f"❌ Error connecting to Snowflake: {e}")
@@ -139,12 +140,12 @@ def save_session_state(user_name, session_state, cur_timestamp, source_page, rol
             # """
             # cur.execute(create_table_query)
             insert_query = """
-            INSERT INTO chat_history (user_name, chat_history, cur_timestamp, source_page, role)
+            INSERT INTO SKILLPATH_DB.RAW_DATA.CHAT_HISTORY (user_name, chat_history, cur_timestamp, source_page, role)
             VALUES (%s, %s, %s, %s, %s);
             """
             cur.execute(insert_query, (user_name, session_state, cur_timestamp, source_page, role))
             conn.commit()
-            logger.info(f"✅ Chat history saved to SKILLPATH_DB.RAW_DATA.CHAT_HISTORY for user {user_name} with role {role_value}")
+            logger.info(f"✅ Chat history saved to SKILLPATH_DB.RAW_DATA.CHAT_HISTORY for user {user_name} with role {role}")
             return True, "Chat history saved successfully"
         except Exception as e:
             logger.error(f"❌ Error saving chat history: {e}")
@@ -159,7 +160,7 @@ def retrieve_session_state(user_name, limit):
         cur = conn.cursor()
         cur.execute("""
             SELECT chat_history, cur_timestamp, source_page, role
-            FROM chat_history
+            FROM SKILLPATH_DB.RAW_DATA.CHAT_HISTORY
             WHERE user_name = %s
             ORDER BY cur_timestamp DESC
             LIMIT %s
