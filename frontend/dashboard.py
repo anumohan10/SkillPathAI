@@ -5,101 +5,435 @@ import streamlit as st
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# from backend.services.resume_parser import extract_text
-# from backend.services.cortex_service import ResumeSearchService
-# from backend.services.chat_service import ChatService
-# from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
-# from frontend.components.career_chat import CareerChat
-# from backend.services.learning_path_service import get_learning_path
-#from frontend.pages.learning_path import display_learning_path
-
-# Import page rendering functions
-# Import page rendering functions
-from frontend.dashboard_page import render_dashboard_page
-from frontend.profile_page import render_profile_page
-# from frontend.courses_page import render_courses_page
-from frontend.guidance_hub_page import render_guidance_hub_page
-from frontend.learning_path_page import render_learning_path_page
-from frontend.career_transition_page import render_career_transition_page
+from backend.services.resume_parser import extract_text
+from backend.services.cortex_service import ResumeSearchService
+from backend.services.chat_service import ChatService
+from backend.services.skill_matcher import match_skills, extract_skills_from_text, get_job_requirements, generate_skill_recommendations
+from frontend.components.career_chat import CareerChat
 
 # Load custom CSS from styles.css
-with open("styles.css", "r") as f:
+with open("frontend/styles.css", "r") as f:
     css = f.read()
 st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
-# --- Main Application Layout ---
-def main_app():
-    """Sets up the sidebar navigation and displays the selected page."""
+# --- Dashboard ---
+def dashboard():
+    st.header("Dashboard")
+    st.write(f"Welcome, {st.session_state.get('username', 'Guest')}!")
+    
+    # User stats in a card
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Skills Identified", "12")
+        with col2:
+            st.metric("Learning Progress", "65%")
+        with col3:
+            st.metric("Career Matches", "8")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # Initialize current_page in session state if it doesn't exist
-    if "current_page" not in st.session_state:
-        st.session_state.current_page = "Dashboard" # Default page
+    # Progress charts in a card
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        st.subheader("Your Learning Progress")
+        data = {
+            "Python Basics": 100,
+            "Data Analysis": 80,
+            "Machine Learning": 60,
+            "Web Development": 40,
+            "Cloud Services": 20
+        }
+        st.bar_chart(data)
+        st.markdown('</div>', unsafe_allow_html=True)
 
+    # Recent activity in a card
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        st.subheader("Recent Activity")
+        st.info("Completed Python Basics course")
+        st.info("Added new skills to your profile")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# --- Profile ---
+def profile():
+    st.header("Profile")
+    
+    # User info in a card
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            st.image("https://via.placeholder.com/150", width=150)
+        with col2:
+            st.write(f"## {st.session_state.get('username', 'Guest')}")
+            st.write("Member since: January 2023")
+            st.write("Career Goal: Data Scientist")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Skills in a card
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        st.subheader("Your Skills")
+        skills = {
+            "Technical Skills": ["Python", "SQL", "Data Analysis", "Pandas", "Matplotlib"],
+            "Soft Skills": ["Communication", "Teamwork", "Problem Solving"],
+            "Industry Knowledge": ["Healthcare", "Finance"]
+        }
+        for category, skill_list in skills.items():
+            st.write(f"**{category}:**")
+            st.write(", ".join(skill_list))
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.button("Edit Profile"):
+        st.session_state["profile_edit"] = True
+    
+    if st.session_state.get("profile_edit", False):
+        with st.container():
+            st.markdown('<div class="container-card">', unsafe_allow_html=True)
+            with st.form("profile_form"):
+                name = st.text_input("Full Name")
+                email = st.text_input("Email")
+                st.form_submit_button("Save")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+# --- Courses ---
+def courses():
+    st.header("Courses")
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        st.write("Search and explore courses available on the platform.")
+        search_query = st.text_input("Search for courses:")
+        if st.button("Search"):
+            st.write(f"Results for '{search_query}' will be displayed here.")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# --- Learning Path ---
+def learning_path():
+    st.header("Learning Path")
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        st.write("Generate your personalized learning path based on your skills and goals.")
+        study_hours = st.slider("Preferred study hours per week:", 1, 40, 10)
+        if st.button("Generate Learning Path"):
+            st.write("Generating learning path...")
+            st.success("Your personalized learning path is ready!")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# --- Career Transition Chat System ---
+def career_transition():
+    st.header("Career Transition Assistant")
+    
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        # Initialize chat state and history
+        if "career_chat_state" not in st.session_state:
+            st.session_state["career_chat_state"] = "welcome"
+            st.session_state["chat_messages"] = []
+        
+        # Initialize user data
+        if "career_user_data" not in st.session_state:
+            st.session_state["career_user_data"] = {}
+        
+        # Add welcome message if this is the first interaction
+        if st.session_state["career_chat_state"] == "welcome":
+            welcome_message = {
+                "role": "assistant",
+                "content": "👋 Hi there! I'm your Career Transition Assistant. I'll help you identify your current skills and create a personalized path to your dream career. What's your name?"
+            }
+            st.session_state["chat_messages"].append(welcome_message)
+            st.session_state["career_chat_state"] = "ask_name"
+        
+        # Display chat history
+        for message in st.session_state["chat_messages"]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+        
+        # Handle user input based on current state
+        if st.session_state["career_chat_state"] == "ask_name":
+            # Get name via chat input
+            user_input = st.chat_input("Enter your name...")
+            if user_input:
+                # Add user message to chat
+                st.session_state["chat_messages"].append({"role": "user", "content": user_input})
+                
+                # Store name
+                st.session_state["career_user_data"]["name"] = user_input
+                
+                # Add assistant response
+                assistant_msg = {
+                    "role": "assistant", 
+                    "content": f"Nice to meet you, {user_input}! To help with your career transition, I'll need to analyze your resume. Please upload it as a PDF or DOCX file."
+                }
+                st.session_state["chat_messages"].append(assistant_msg)
+                
+                # Move to next state
+                st.session_state["career_chat_state"] = "ask_resume"
+                st.rerun()
+        
+        elif st.session_state["career_chat_state"] == "ask_resume":
+            # Create file uploader in the chat
+            with st.container():
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    uploaded_file = st.file_uploader("Upload your resume (PDF/DOCX):", type=["pdf", "docx"], key="resume_uploader")
+                with col2:
+                    submit_button = st.button("Upload", key="resume_submit")
+            
+            if submit_button and uploaded_file:
+                # Process the file
+                try:
+                    with st.spinner("Reading your resume..."):
+                        resume_text = extract_text(uploaded_file)
+                        
+                        if not resume_text or len(resume_text) < 50:
+                            error_msg = {"role": "assistant", "content": "⚠️ I couldn't read enough text from that file. Could you try uploading a different format?"}
+                            st.session_state["chat_messages"].append(error_msg)
+                            st.rerun()
+                        
+                        # Store resume text
+                        st.session_state["career_user_data"]["resume_text"] = resume_text
+                        
+                        # Add messages to chat
+                        user_msg = {"role": "user", "content": f"*Uploaded resume: {uploaded_file.name}*"}
+                        st.session_state["chat_messages"].append(user_msg)
+                        
+                        assistant_msg = {
+                            "role": "assistant", 
+                            "content": "Great! I've received your resume. What career are you interested in transitioning to?"
+                        }
+                        st.session_state["chat_messages"].append(assistant_msg)
+                        
+                        # Update state
+                        st.session_state["career_chat_state"] = "ask_target_career"
+                        st.rerun()
+                        
+                except Exception as e:
+                    error_msg = {"role": "assistant", "content": f"⚠️ There was an error processing your resume: {str(e)}. Please try again."}
+                    st.session_state["chat_messages"].append(error_msg)
+                    st.rerun()
+        
+        elif st.session_state["career_chat_state"] == "ask_target_career":
+            # Get target career via chat input
+            user_input = st.chat_input("What career are you interested in?")
+            if user_input:
+                # Add to chat
+                st.session_state["chat_messages"].append({"role": "user", "content": user_input})
+                
+                # Store target career
+                st.session_state["career_user_data"]["target_career"] = user_input
+                
+                # Add thinking message
+                assistant_msg = {
+                    "role": "assistant", 
+                    "content": f"Thanks! I'll now analyze your resume to determine the best path to transition to a {user_input} role. This will take a moment..."
+                }
+                st.session_state["chat_messages"].append(assistant_msg)
+                
+                # Move to analysis state
+                st.session_state["career_chat_state"] = "analyzing"
+                st.rerun()
+        
+        elif st.session_state["career_chat_state"] == "analyzing":
+            # Perform analysis
+            with st.spinner("Analyzing your resume and career path..."):
+                try:
+                    # Get user data
+                    name = st.session_state["career_user_data"]["name"]
+                    resume_text = st.session_state["career_user_data"]["resume_text"]
+                    target_career = st.session_state["career_user_data"]["target_career"]
+                    
+                    # Initialize chat service if available
+                    try:
+                        if "chat_service" not in st.session_state:
+                            st.session_state["chat_service"] = ChatService()
+                        chat_service = st.session_state["chat_service"]
+                    except Exception as e:
+                        chat_service = None
+                        st.warning(f"Could not initialize LLM service: {str(e)}")
+                    
+                    # Extract skills
+                    if chat_service:
+                        try:
+                            extracted_skills = chat_service.extract_skills(resume_text)
+                            extraction_method = "LLM"
+                        except Exception as e:
+                            extracted_skills = extract_skills_from_text(resume_text)
+                            extraction_method = "regex"
+                    else:
+                        extracted_skills = extract_skills_from_text(resume_text)
+                        extraction_method = "regex"
+                    
+                    # Store extracted skills
+                    st.session_state["career_user_data"]["extracted_skills"] = extracted_skills
+                    st.session_state["career_user_data"]["extraction_method"] = extraction_method
+                    
+                    # Match skills with requirements
+                    skill_analysis = match_skills(extracted_skills, target_career)
+                    st.session_state["career_user_data"]["skill_analysis"] = skill_analysis
+                    
+                    # Generate career advice
+                    if chat_service:
+                        try:
+                            career_advice = chat_service.generate_career_advice(extracted_skills, target_career)
+                            advice_method = "LLM"
+                        except Exception as e:
+                            career_advice = skill_analysis.get("recommendations", "")
+                            advice_method = "template"
+                    else:
+                        career_advice = skill_analysis.get("recommendations", "")
+                        advice_method = "template"
+                    
+                    # Store advice
+                    st.session_state["career_user_data"]["career_advice"] = career_advice
+                    st.session_state["career_user_data"]["advice_method"] = advice_method
+                    
+                    # Try to store in database (non-critical)
+                    try:
+                        service = ResumeSearchService()
+                        service.store_resume(name, resume_text, extracted_skills, target_career)
+                    except Exception as e:
+                        pass
+                    
+                    # Add completion message
+                    completed_msg = {
+                        "role": "assistant",
+                        "content": f"I've completed my analysis for your transition to a {target_career} role. Here's what I found:"
+                    }
+                    st.session_state["chat_messages"].append(completed_msg)
+                    
+                    # Move to results state
+                    st.session_state["career_chat_state"] = "show_results"
+                    st.rerun()
+                    
+                except Exception as e:
+                    error_msg = {"role": "assistant", "content": f"⚠️ I encountered an error during analysis: {str(e)}. Let's try again."}
+                    st.session_state["chat_messages"].append(error_msg)
+                    st.session_state["career_chat_state"] = "ask_target_career"
+                    st.rerun()
+        
+        elif st.session_state["career_chat_state"] == "show_results":
+            # Display results
+            if "results_displayed" not in st.session_state:
+                # Get data
+                name = st.session_state["career_user_data"]["name"]
+                target_career = st.session_state["career_user_data"]["target_career"]
+                extracted_skills = st.session_state["career_user_data"]["extracted_skills"]
+                skill_analysis = st.session_state["career_user_data"]["skill_analysis"]
+                career_advice = st.session_state["career_user_data"]["career_advice"]
+                
+                # Add skills message
+                skills_msg = {
+                    "role": "assistant",
+                    "content": f"### Your Current Skills\n" + "\n".join([f"- {skill}" for skill in extracted_skills])
+                }
+                st.session_state["chat_messages"].append(skills_msg)
+                
+                # Add skill gap message if available
+                if "essential_skills" in skill_analysis and skill_analysis["essential_skills"]:
+                    gap_content = f"### Skills Needed for {target_career}\n\n**Essential Skills:**\n"
+                    
+                    for skill in skill_analysis.get("essential_skills", []):
+                        if skill in extracted_skills:
+                            gap_content += f"- ✅ {skill}\n"
+                        else:
+                            gap_content += f"- ❌ {skill}\n"
+                    
+                    gap_content += "\n**Preferred Skills:**\n"
+                    for skill in skill_analysis.get("preferred_skills", []):
+                        if skill in extracted_skills:
+                            gap_content += f"- ✅ {skill}\n"
+                        else:
+                            gap_content += f"- ❓ {skill}\n"
+                    
+                    gap_msg = {"role": "assistant", "content": gap_content}
+                    st.session_state["chat_messages"].append(gap_msg)
+                
+                # Add career advice
+                advice_msg = {"role": "assistant", "content": career_advice}
+                st.session_state["chat_messages"].append(advice_msg)
+                
+                # Add follow-up question
+                followup_msg = {
+                    "role": "assistant",
+                    "content": "Do you have any specific questions about this career transition plan? Feel free to ask!"
+                }
+                st.session_state["chat_messages"].append(followup_msg)
+                
+                # Mark as displayed
+                st.session_state["results_displayed"] = True
+                st.rerun()
+            
+            # Handle follow-up questions
+            user_input = st.chat_input("Ask a follow-up question...")
+            if user_input:
+                # Add question to chat
+                st.session_state["chat_messages"].append({"role": "user", "content": user_input})
+                
+                # Try to get LLM response
+                try:
+                    if "chat_service" in st.session_state and st.session_state["chat_service"]:
+                        chat_service = st.session_state["chat_service"]
+                        
+                        # Create context
+                        user_context = {
+                            "name": st.session_state["career_user_data"]["name"],
+                            "target_role": st.session_state["career_user_data"]["target_career"],
+                            "skills": st.session_state["career_user_data"]["extracted_skills"]
+                        }
+                        
+                        # Get response
+                        response = chat_service.answer_career_question(user_input, user_context)
+                    else:
+                        # Fallback template response
+                        response = (
+                            f"That's a great question about transitioning to a {st.session_state['career_user_data']['target_career']} role. "
+                            f"Based on your background, I recommend focusing on building relevant technical skills "
+                            f"through online courses and practical projects. Networking with professionals in the field "
+                            f"can also provide valuable insights and opportunities."
+                        )
+                except Exception as e:
+                    response = (
+                        f"That's a good question. For transitioning to {st.session_state['career_user_data']['target_career']}, "
+                        f"I generally recommend a combination of structured learning, practical projects, and professional networking. "
+                        f"This approach helps you build skills, demonstrate them, and connect with opportunities."
+                    )
+                
+                # Add response to chat
+                st.session_state["chat_messages"].append({"role": "assistant", "content": response})
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Add restart button outside the chat flow
     with st.sidebar:
-        st.title("SkillPathAI") # Consistent Title
-        display_name = st.session_state.get("name") or st.session_state.get("username", "Guest")
-        st.write(f"👋 Welcome, {display_name}!")
-        st.markdown("---")
-
-        # Define navigation options
-        nav_options = ["Dashboard", "Profile", "Guidance Hub"]
-
-        # Use st.session_state.current_page to determine the default index
-        try:
-            # Find index for current page, default to 0 (Dashboard) if not found
-            current_index = nav_options.index(st.session_state.current_page)
-        except ValueError:
-             # Handle cases where current_page might be 'Learning Path' or 'Career Transition'
-            if st.session_state.current_page in ["Learning Path", "Career Transition"]:
-                 current_index = nav_options.index("Guidance Hub")
-            else:
-                 current_index = 0 # Default to Dashboard if page unknown
-
-        # Create the radio button navigation
-        selection = st.radio(
-            "Navigation",
-            nav_options,
-            index=current_index,
-            key="main_nav" # Add a key for stability
-        )
-
-        # Update current_page based on sidebar selection *only if it changed*
-        if selection != st.session_state.current_page:
-             # Prevent resetting to 'Guidance Hub' when already on LP or CT
-             if not (selection == "Guidance Hub" and st.session_state.current_page in ["Learning Path", "Career Transition"]):
-                 st.session_state.current_page = selection
-                 st.rerun() # Rerun immediately when sidebar selection changes
-
-        st.markdown("---")
-        if st.button("Logout"):
-            # Reset relevant session state variables on logout
-            st.session_state["authenticated"] = False
-            st.session_state["current_page"] = "Dashboard" # Reset to default page
-            # Clear other potential states if necessary
-            # e.g., del st.session_state.lp_state, del st.session_state.ct_state etc.
+        if st.button("Start New Career Analysis"):
+            # Reset chat
+            st.session_state["career_chat_state"] = "welcome"
+            st.session_state["chat_messages"] = []
+            st.session_state["career_user_data"] = {}
+            if "results_displayed" in st.session_state:
+                del st.session_state["results_displayed"]
             st.rerun()
 
-    # Display the selected page based on the session state
-    page_to_display = st.session_state.current_page
+# --- Main Application Layout with Full Navigation ---
+def main_app():
+    st.sidebar.title("Navigation")
+    selection = st.sidebar.radio(
+        "Go to", 
+        ["Dashboard", "Profile", "Courses", "Learning Path", "Career Transition"]
+    )
 
-    # Create main content container
-    main_content = st.container()
+    if selection == "Dashboard":
+        dashboard()
+    elif selection == "Profile":
+        profile()
+    elif selection == "Courses":
+        courses()
+    elif selection == "Learning Path":
+        learning_path()
+    elif selection == "Career Transition":
+        career_transition()
 
-    # Main content area
-    with main_content:
-        if st.session_state.current_page == "Dashboard":
-            render_dashboard_page()
-        elif st.session_state.current_page == "Profile":
-            render_profile_page()
-        # elif st.session_state.current_page == "Courses":
-        #     render_courses_page()
-        elif st.session_state.current_page == "Learning Path":
-            render_learning_path_page()
-        elif st.session_state.current_page == "Guidance Hub":
-            render_guidance_hub_page()
-        elif st.session_state.current_page == "Career Transition":
-            render_career_transition_page()
-        else:
-            # Fallback if state is somehow invalid
-            st.error("Invalid page selected.")
-            render_dashboard_page() # Show dashboard as default fallback
+    if st.sidebar.button("Logout"):
+        st.session_state["authenticated"] = False
+        st.rerun()
