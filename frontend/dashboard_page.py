@@ -26,7 +26,7 @@ for handler in logger.handlers[:]:
     if isinstance(handler, logging.FileHandler) and handler != file_handler:
         logger.removeHandler(handler)
 
-FASTAPI_BASE_URL = os.environ.get("API_URL", "http://localhost:8000")
+FASTAPI_BASE_URL = os.environ.get("API_URL", "http://backend:8000")
 
 def generate_chat_preview(chat_list):
     """

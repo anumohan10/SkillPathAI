@@ -238,7 +238,7 @@ class TransitionPlanResponse(BaseModel):
 When converting frontend components to use the API:
 
 1. Import the requests library: `import requests`
-2. Set the API URL (consider using an environment variable): `API_URL = "http://localhost:8000"`
+2. Set the API URL (consider using an environment variable): `API_URL = "http://backend:8000"`
 3. Replace direct function calls with API requests:
 
 ```python

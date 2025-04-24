@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__) # Use __name__ for logger
 now = datetime.now()
 
 # Define API URL - should be configurable in production
-API_URL = os.environ.get("API_URL", "http://localhost:8000")
+API_URL = os.environ.get("API_URL", "http://backend:8000")
 
 # Custom JSON encoder to handle non-serializable objects
 class CustomJSONEncoder(json.JSONEncoder):

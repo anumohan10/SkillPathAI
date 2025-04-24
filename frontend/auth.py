@@ -8,7 +8,7 @@ import json
 import os
 
 # Define API URL - using environment variable or fallback to Docker service name
-API_URL = os.environ.get("API_URL", "http://localhost:8000")
+API_URL = os.environ.get("API_URL", "http://backend:8000")
 
 # Load custom CSS from styles.css
 with open("styles.css", "r") as f:

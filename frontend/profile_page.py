@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import os
 
-API_URL = "http://localhost:8000"  # Replace with your backend URL
+API_URL = "http://backend:8000"  # Replace with your backend URL
 
 def render_profile_page():
     st.header("Profile")
