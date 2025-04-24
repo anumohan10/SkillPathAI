@@ -1,0 +1,7 @@
+# .streamlit/config.toml
+[theme]
+primaryColor = "#1468D7"      # Vibrant blue for buttons and interactive elements
+backgroundColor = "#FFFFFF"   # White background
+secondaryBackgroundColor = "#FAF9F8"  # Off-white for secondary backgrounds (e.g., sidebar, cards)
+textColor = "#2C2C2C"         # Near-black for primary text
+font = "sans serif"
