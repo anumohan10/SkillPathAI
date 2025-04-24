@@ -1,5 +1,5 @@
 import os
-from database import get_snowflake_connection
+from backend.database import get_snowflake_connection
 
 def upload_to_snowflake(file_path, file_name, stage_name):
     print(f"Uploading {file_name} to {stage_name}...")
