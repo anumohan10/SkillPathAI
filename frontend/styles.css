@@ -69,9 +69,3 @@ p:not(.stButton *), div:not(.stButton *), span:not(.stButton *), label:not(.stBu
 .stRadio > label > div > div[aria-checked="true"] > div {
     background-color: #FFFFFF !important; /* White dot inside the selected radio button */
 }
-
-.stImage img {
-    max-width: 350px; 
-    margin: 0 auto;
-    display: block;
-}

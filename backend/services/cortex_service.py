@@ -1,4 +1,3 @@
-#backend/services/cortex_service.py
 import json
 import uuid
 import logging
@@ -109,90 +108,27 @@ class ResumeSearchService:
         # Normalize spaces
         resume_text = re.sub(r'\s+', ' ', resume_text).strip()
         return resume_text
-    
     def _calculate_missing_skills(self, extracted_skills, target_role):
-        """
-        Dynamically calculate missing skills for a target role using LLM.
-        
-        Args:
-            extracted_skills (list): Skills extracted from the resume
-            target_role (str): The target career role
-            
-        Returns:
-            list: Missing skills for the target role
-        """
-        try:
-            # Try to initialize ChatService dynamically
-            from backend.services.chat_service import ChatService
-            chat_service = ChatService()
-            
-            # Use the ChatService to identify missing skills
-            missing_skills = chat_service.identify_missing_skills(extracted_skills, target_role)
-            
-            # Ensure we have a valid list
-            if isinstance(missing_skills, list) and missing_skills:
-                return missing_skills
-            else:
-                # Fallback to query-based approach
-                return self._query_based_missing_skills(extracted_skills, target_role)
-                
-        except Exception as e:
-            logger.error(f"Error using ChatService for missing skills: {str(e)}")
-            # Fallback to query-based approach
-            return self._query_based_missing_skills(extracted_skills, target_role)
-            
-    def _query_based_missing_skills(self, extracted_skills, target_role):
-        """
-        Fallback approach to determine missing skills using Snowflake query.
-        
-        Args:
-            extracted_skills (list): Skills extracted from the resume
-            target_role (str): The target career role
-            
-        Returns:
-            list: Missing skills for the target role
-        """
-        try:
-            with self.get_cursor() as cursor:
-                # Query to find skills commonly associated with the target role
-                query = f"""
-                SELECT PARSE_JSON(
-                    SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-                        'SKILLPATH_SEARCH_POC',
-                        '{{
-                            "query": "What skills are required for a {target_role} role in 2025?",
-                            "columns": ["skill_name"],
-                            "limit": 10
-                        }}'
-                    )
-                )['results'] as results;
-                """
-                
-                cursor.execute(query)
-                result = cursor.fetchone()[0]
-                
-                if not result:
-                    return ["Technical Proficiency", "Problem Solving", "Communication"]
-                
-                # Extract skill names from results
-                required_skills = []
-                for item in result:
-                    if 'skill_name' in item and item['skill_name']:
-                        required_skills.append(item['skill_name'])
-                
-                # Find missing skills
-                missing_skills = [skill for skill in required_skills if skill not in extracted_skills]
-                
-                # If no skills are found missing, provide some generic ones based on the role name
-                if not missing_skills:
-                    missing_skills = [f"{target_role} Best Practices", "Advanced Tools", "Industry Knowledge"]
-                
-                return missing_skills
-                
-        except Exception as e:
-            logger.error(f"Error in query-based missing skills: {str(e)}")
-            # Very basic fallback if all else fails
-            return ["Communication Skills", "Technical Knowledge", "Problem Solving"]
+        """Calculate missing skills for a target role."""
+        # Define required skills for common roles
+        skill_requirements = {
+        "Data Scientist": ["Python", "SQL", "Machine Learning", "Statistics", "Data Visualization"],
+        "Software Engineer": ["Python", "Java", "JavaScript", "Git", "Docker"],
+        "Full Stack Developer": ["HTML", "CSS", "JavaScript", "React", "Node.js"],
+        "Data Analyst": ["SQL", "Excel", "Data Visualization", "Python", "Statistics"],
+        "DevOps Engineer": ["Docker", "Kubernetes", "AWS", "Linux", "CI/CD"],
+        "Product Manager": ["Agile", "User Research", "Strategy", "Communication"],
+        "UX Designer": ["User Research", "Wireframing", "Prototyping", "UI Design"],
+        "AI Engineer": ["Python", "TensorFlow", "PyTorch", "Machine Learning"]
+    }
+    
+    # Get required skills for the target role (or empty list if not found)
+        required_skills = skill_requirements.get(target_role, [])
+    
+    # Find missing skills
+        missing_skills = [skill for skill in required_skills if skill not in extracted_skills]
+    
+        return missing_skills
     
     def store_resume(self, user_name: str, resume_text: str, extracted_skills: list, target_role: str):
         """Store resume details in the Snowflake table with proper array formatting."""
@@ -201,37 +137,35 @@ class ResumeSearchService:
             try:
                 resume_id = str(uuid.uuid4())
                 missing_skills = self._calculate_missing_skills(extracted_skills, target_role)
-
-                # Clean resume text for SQL insertion (escape single quotes)
+            
+            # Format arrays properly for Snowflake
+                extracted_skills_str = "ARRAY_CONSTRUCT(" + ", ".join([f"'{skill}'" for skill in extracted_skills]) + ")"
+                missing_skills_str = "ARRAY_CONSTRUCT(" + ", ".join([f"'{skill}'" for skill in missing_skills]) + ")"
+            
+            # Clean resume text for SQL insertion (single quotes need to be escaped)
                 cleaned_resume_text = resume_text.replace("'", "''")
-
-                # Prepare SQL with PARSE_JSON for array columns
-                insert_query = """
-                INSERT INTO SKILLPATH_DB.PUBLIC.RESUMES 
-                (id, user_name, resume_text, extracted_skills, target_role, missing_skills)
-                SELECT %s, %s, %s, PARSE_JSON(%s), %s, PARSE_JSON(%s)
-                """
-
-                # Execute with JSON strings for array fields
-                cursor.execute(
-                    insert_query,
-                    (
-                    resume_id,
-                    user_name,
-                    cleaned_resume_text,
-                    json.dumps(extracted_skills),
-                    target_role,
-                    json.dumps(missing_skills),
-                 ),
-                )
-
+            
+                insert_query = f"""
+            INSERT INTO SKILLPATH_DB.PUBLIC.RESUMES 
+            (id, user_name, resume_text, extracted_skills, target_role, missing_skills)
+            VALUES (
+                '{resume_id}', 
+                '{user_name}', 
+                '{cleaned_resume_text}', 
+                {extracted_skills_str}, 
+                '{target_role}', 
+                {missing_skills_str}
+            )
+            """
+            
+                cursor.execute(insert_query)
                 self.conn.commit()
+            
                 logger.info(f"✅ Successfully stored resume for {user_name} in Snowflake.")
-
+        
             except Exception as e:
                 logger.error(f"❌ Error storing resume: {e}")
                 raise
-
 
     def search_resumes(self, resume_text: str, target_role: str = None, limit: int = 5):
         """Search resumes using Cortex Search with cleaned text."""
