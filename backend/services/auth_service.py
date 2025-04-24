@@ -65,3 +65,71 @@ def get_user_by_username(username):
             cur.close()
             conn.close()
     return None
+
+def get_user_profile_by_username(username):
+    conn = get_snowflake_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT user_id, name, username, email, created_at
+                FROM users
+                WHERE username = %s
+            """, (username,))
+            row = cur.fetchone()
+            if row:
+                return {
+                    "user_id": row[0],
+                    "name": row[1],
+                    "username": row[2],
+                    "email": row[3],
+                    "created_at": row[4]
+                }
+        finally:
+            cur.close()
+            conn.close()
+    return None
+
+def update_user_password(username, new_hashed_password):
+    conn = get_snowflake_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE users
+                SET password = %s
+                WHERE username = %s
+            """, (new_hashed_password, username))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating password for {username}: {e}")
+            return False
+        finally:
+            cur.close()
+            conn.close()
+    return False
+
+def get_user_profile_by_username(username):
+    conn = get_snowflake_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT user_id, name, username, email, created_at
+                FROM users
+                WHERE username = %s
+            """, (username,))
+            row = cur.fetchone()
+            if row:
+                return {
+                    "user_id": row[0],
+                    "name": row[1],
+                    "username": row[2],
+                    "email": row[3],
+                    "created_at": row[4]
+                }
+        finally:
+            cur.close()
+            conn.close()
+    return None

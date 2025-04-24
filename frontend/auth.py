@@ -21,6 +21,8 @@ def login_page():
 
     with st.container():
         st.markdown('<div class="container-card">', unsafe_allow_html=True)
+
+        # Login form
         with st.form("login_form"):
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
@@ -28,12 +30,10 @@ def login_page():
 
             if submit:
                 try:
-                    # Call the API instead of direct function call
                     response = requests.post(
                         f"{API_URL}/auth/login",
                         json={"username": username, "password": password}
                     )
-                    
                     if response.status_code == 200:
                         data = response.json()
                         st.session_state["authenticated"] = True
@@ -47,7 +47,17 @@ def login_page():
                         st.error("Invalid username or password.")
                 except Exception as e:
                     st.error(f"Error connecting to the API: {str(e)}")
+
+        # Add a horizontal line or spacer
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Forgot Password button styled as a link
+        if st.button("🔐 Forgot Password?"):
+            st.session_state["auth_page"] = "Forgot Password"
+            st.rerun()
+
         st.markdown('</div>', unsafe_allow_html=True)
+
 
 # --- Sign Up Page ---
 def signup_page():
@@ -84,9 +94,7 @@ def signup_page():
                         
                         if response.status_code == 201:
                             data = response.json()
-                            st.success("Sign-up successful! Please log in.")
-                            st.session_state["auth_page"] = "Login"
-                            st.rerun()
+                            st.success("Account created successfully! Please select 'Login' from the sidebar to log in.")
                         elif response.status_code == 400:
                             error_data = response.json()
                             st.error(error_data.get("detail", "Username already exists."))
@@ -94,4 +102,35 @@ def signup_page():
                             st.error("An error occurred during sign up.")
                     except Exception as e:
                         st.error(f"Error connecting to the API: {str(e)}")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+# Forget Password 
+def forgot_password_page():
+    st.title("Forgot Password")
+
+    with st.container():
+        st.markdown('<div class="container-card">', unsafe_allow_html=True)
+        with st.form("forgot_form"):
+            username = st.text_input("Username")
+            new_password = st.text_input("New Password", type="password")
+            confirm_password = st.text_input("Confirm Password", type="password")
+            submit = st.form_submit_button("Reset Password")
+
+            if submit:
+                if new_password != confirm_password:
+                    st.error("Passwords do not match.")
+                else:
+                    try:
+                        response = requests.post(
+                            f"{API_URL}/auth/reset-password",
+                            json={"username": username, "new_password": new_password}
+                        )
+                        if response.status_code == 200:
+                            st.success("Password reset successfully! Please select 'Login' from the sidebar to log in.")
+                            #st.session_state["auth_page"] = "Login"
+                            #st.rerun()
+                        else:
+                            st.error(response.json().get("detail", "Failed to reset password"))
+                    except Exception as e:
+                        st.error(f"API error: {str(e)}")
         st.markdown('</div>', unsafe_allow_html=True)

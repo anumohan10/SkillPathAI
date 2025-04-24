@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
 from backend.services.auth_service import (
     hash_password, check_password,
     create_users_table, insert_user,
-    get_user_by_username
+    get_user_by_username, update_user_password, get_user_profile_by_username
 )
 from typing import Optional
 
@@ -43,6 +43,10 @@ class TokenResponse(BaseModel):
     token_type: str
     user: UserResponse
 
+class ResetPasswordRequest(BaseModel):
+    username: str
+    new_password: str
+    
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def signup(user_data: UserCreate):
     # Check if username already exists
@@ -89,4 +93,29 @@ def login(login_data: UserLogin):
             "username": login_data.username,
             "email": user.get("email")
         }
+    }
+@router.post("/reset-password")
+def reset_password(request: ResetPasswordRequest):
+    user = get_user_by_username(request.username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    hashed_pw = hash_password(request.new_password)
+    success = update_user_password(request.username, hashed_pw)
+
+    if success:
+        return {"message": "Password updated successfully"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to update password")
+
+@router.get("/user-profile", response_model=UserResponse)
+def get_user_profile(username: str):
+    user = get_user_profile_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {
+        "user_id": user["user_id"],
+        "name": user["name"],
+        "username": user["username"],
+        "email": user["email"]
     }

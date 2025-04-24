@@ -50,6 +50,7 @@ def render_dashboard_page():
                 print("State_Data:\n", chat_list)
                 timestamp = record.get("cur_timestamp")
                 source = record.get("source_page", "unknown")
+                role = record.get("role", "unknown")
 
                 # 🛡️ Ensure chat_list is properly parsed
                 if isinstance(chat_list, str):
@@ -62,8 +63,9 @@ def render_dashboard_page():
                 except Exception as e:
                     preview = f"(preview error: {e})"
 
-                
-                label = f"🗨️ {source.replace('_', ' ').title()} Chat – {timestamp[:19].replace('T',' ')}"
+                chat_length = len(chat_list)
+                st.caption(f"🔁 {chat_length} message(s) | 🎯 Role: {role.title()}")
+                label = f"🗨️ {source.replace('_', ' ').title()} – {timestamp} – Role: {role.title()}"
                 if st.button(label, key=f"chat_{i}"):
                     if source == "career_transition":
                         filtered_chat_list = {k: v for k, v in chat_list.items() if k not in ("main_nav","ct_followup_input")}
