@@ -37,5 +37,9 @@ else\n\
   exit 1\n\
 fi' > /app/run.sh && chmod +x /app/run.sh
 
+# Set timezone (replace "America/New_York" with your timezone)
+ENV TZ=America/New_York
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # Set the entrypoint
 ENTRYPOINT ["/app/run.sh"] 
