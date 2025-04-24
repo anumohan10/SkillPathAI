@@ -6,5 +6,12 @@ __pycache__/
 .vscode/
 target/
 dbt_packages/
+log/
+.DS_Store
+__pycache__/
+*.pyc
+.vscode/
+target/
+dbt_packages/
 logs/
 .cursor
