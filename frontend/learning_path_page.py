@@ -18,7 +18,7 @@ logging.basicConfig(
     level=logging.INFO, # Changed default level to INFO
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("learning_path_debug.log", mode='a'), # Append mode
+        logging.FileHandler("logs/learning_path_debug.log", mode='a'), # Append mode
         logging.StreamHandler(sys.stdout)
     ]
 )

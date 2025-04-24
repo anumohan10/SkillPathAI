@@ -9,7 +9,7 @@ from datetime import datetime
 
 # Configure logging with a rotating file handler
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s')
-log_file = 'dashboard.log'
+log_file = 'logs/dashboard.log'
 
 # Create a handler that rotates log files when they reach 1MB
 file_handler = RotatingFileHandler(log_file, maxBytes=1_000_000, backupCount=3)

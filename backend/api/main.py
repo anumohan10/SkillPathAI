@@ -98,7 +98,7 @@ logging_config = {
         },
         "rotating_file": {
             "class": "logging.handlers.RotatingFileHandler",
-            "filename": "api_server.log",
+            "filename": "logs/api_server.log",
             "maxBytes": 1048576,
             "backupCount": 3,
             "level": "DEBUG",

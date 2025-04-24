@@ -6,7 +6,7 @@ __pycache__/
 .vscode/
 target/
 dbt_packages/
-logs/
+log/
 .DS_Store
 __pycache__/
 *.pyc

@@ -18,7 +18,7 @@ logging.basicConfig(
     level=logging.INFO, # Changed default level
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("career_transition_debug.log", mode='a'), # Append mode
+        logging.FileHandler("logs/career_transition_debug.log", mode='a'), # Append mode
         logging.StreamHandler(sys.stdout)
     ]
 )

@@ -14,7 +14,7 @@ import sys
 logging.basicConfig(
     level=logging.WARNING,  # Only log warnings and errors
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("app_errors.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler("logs/app_errors.log"), logging.StreamHandler()]
 )
 
 logger = logging.getLogger("SkillPathAI")
