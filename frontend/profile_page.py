@@ -27,7 +27,7 @@ def render_profile_page():
         st.markdown('<div class="container-card">', unsafe_allow_html=True)
         col1, col2 = st.columns([1, 3])
         with col1:
-            image_path = "frontend/assets/user_profile.png"
+            image_path = "assets/user_profile.png"
             if os.path.exists(image_path):
                 st.image(image_path, width=150)
             else:

@@ -311,7 +311,6 @@ def fetch_recent_chats(user_name: str, limit: int = Query(5, ge=1, le=20)):
         from backend.database import retrieve_session_state
         rows = retrieve_session_state(user_name, limit)
         
-        logging.info("Data retrieved:", rows[:5])
         
         result = []
         for state_data, timestamp, source, role in rows:

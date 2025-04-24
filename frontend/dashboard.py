@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # Import page rendering functions
 from frontend.dashboard_page import render_dashboard_page
 from frontend.profile_page import render_profile_page
-from frontend.courses_page import render_courses_page
+# from frontend.courses_page import render_courses_page
 from frontend.guidance_hub_page import render_guidance_hub_page
 from frontend.learning_path_page import render_learning_path_page
 from frontend.career_transition_page import render_career_transition_page
@@ -42,7 +42,7 @@ def main_app():
         st.markdown("---")
 
         # Define navigation options
-        nav_options = ["Dashboard", "Profile", "Courses", "Guidance Hub"]
+        nav_options = ["Dashboard", "Profile", "Guidance Hub"]
 
         # Use st.session_state.current_page to determine the default index
         try:
@@ -91,8 +91,8 @@ def main_app():
             render_dashboard_page()
         elif st.session_state.current_page == "Profile":
             render_profile_page()
-        elif st.session_state.current_page == "Courses":
-            render_courses_page()
+        # elif st.session_state.current_page == "Courses":
+        #     render_courses_page()
         elif st.session_state.current_page == "Learning Path":
             render_learning_path_page()
         elif st.session_state.current_page == "Guidance Hub":

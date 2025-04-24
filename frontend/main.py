@@ -1,4 +1,12 @@
 import streamlit as st
+
+# Set page to wide mode - must be the first Streamlit command
+st.set_page_config(
+    page_title="SkillPathAI", # This sets wide mode
+    initial_sidebar_state="expanded"
+)
+
+
 import logging
 import sys
 
@@ -6,19 +14,13 @@ import sys
 logging.basicConfig(
     level=logging.WARNING,  # Only log warnings and errors
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[logging.FileHandler("app_errors.log")]
+    handlers=[logging.FileHandler("app_errors.log"), logging.StreamHandler()]
 )
 
 logger = logging.getLogger("SkillPathAI")
 
-# Set page to wide mode - must be the first Streamlit command
-st.set_page_config(
-    page_title="SkillPathAI",
-    layout="wide",  # This sets wide mode
-    initial_sidebar_state="expanded"
-)
 
-from auth import login_page, signup_page
+from auth import login_page, signup_page, forgot_password_page
 from dashboard import main_app
 import time
 import os
@@ -42,7 +44,7 @@ def main():
 
     # Show splash screen if not yet shown
     if not st.session_state["splash_shown"]:
-        image_path = os.path.join("frontend", "assets", "splash_logo.png")
+        image_path = os.path.join("assets", "splash_logo.png")
         # Center the content using columns
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
