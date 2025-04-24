@@ -5,9 +5,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import streamlit as st
 import requests
 import json
+import os
 
-# Define API URL - should be configurable in production
-API_URL = "http://localhost:8000"
+# Define API URL - using environment variable or fallback to Docker service name
+API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
 # Load custom CSS from styles.css
 with open("styles.css", "r") as f:

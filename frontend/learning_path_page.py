@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__) # Use __name__ for logger
 now = datetime.now()
 
 # Define API URL - should be configurable in production
-API_URL = "http://localhost:8000"
+API_URL = os.environ.get("API_URL", "http://localhost:8000")
 
 # Custom JSON encoder to handle non-serializable objects
 class CustomJSONEncoder(json.JSONEncoder):
@@ -69,7 +69,7 @@ def get_top_skills_for_role_api(target_role):
     try:
         # Call the API endpoint to get top skills
         response = requests.get(
-            f"http://localhost:8000/recommendations/skills/top/{target_role}"
+            f"{API_URL}/recommendations/skills/top/{target_role}"
         )
         if response.status_code == 200:
             data = response.json()
@@ -91,7 +91,7 @@ def get_course_recommendations_api(target_role, user_id=None):
     try:
         # Call the API endpoint to get course recommendations
         response = requests.post(
-            f"http://localhost:8000/recommendations/courses",
+            f"{API_URL}/recommendations/courses",
             json={"role": target_role, "user_id": user_id, "limit": 5}
         )
         if response.status_code == 200:
@@ -123,7 +123,7 @@ def store_skill_ratings_api(learning_path_data):
         
         # Call the API endpoint
         response = requests.post(
-            "http://localhost:8000/user-input/skill-ratings/store",
+            f"{API_URL}/user-input/skill-ratings/store",
             json=api_data
         )
         
@@ -153,7 +153,7 @@ def answer_career_question_api(question, user_context):
         
         # Call the API endpoint
         response = requests.post(
-            "http://localhost:8000/user-input/career-question",
+            f"{API_URL}/user-input/career-question",
             json=request_data
         )
         

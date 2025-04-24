@@ -82,19 +82,24 @@ def main_app():
     # Display the selected page based on the session state
     page_to_display = st.session_state.current_page
 
-    if page_to_display == "Dashboard":
-        render_dashboard_page()
-    elif page_to_display == "Profile":
-        render_profile_page()
-    elif page_to_display == "Courses":
-        render_courses_page()
-    elif page_to_display == "Guidance Hub":
-        render_guidance_hub_page()
-    elif page_to_display == "Learning Path":
-        render_learning_path_page()
-    elif page_to_display == "Career Transition":
-        render_career_transition_page()
-    else:
-        # Fallback if state is somehow invalid
-        st.error("Invalid page selected.")
-        render_dashboard_page() # Show dashboard as default fallback
+    # Create main content container
+    main_content = st.container()
+
+    # Main content area
+    with main_content:
+        if st.session_state.current_page == "Dashboard":
+            render_dashboard_page()
+        elif st.session_state.current_page == "Profile":
+            render_profile_page()
+        elif st.session_state.current_page == "Courses":
+            render_courses_page()
+        elif st.session_state.current_page == "Learning Path":
+            render_learning_path_page()
+        elif st.session_state.current_page == "Guidance Hub":
+            render_guidance_hub_page()
+        elif st.session_state.current_page == "Career Transition":
+            render_career_transition_page()
+        else:
+            # Fallback if state is somehow invalid
+            st.error("Invalid page selected.")
+            render_dashboard_page() # Show dashboard as default fallback

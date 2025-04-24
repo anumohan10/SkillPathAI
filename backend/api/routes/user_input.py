@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form, Qu
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from uuid import uuid4
+from datetime import datetime
 import json
 import logging
 from backend.services.chat_service import ChatService
@@ -153,6 +154,10 @@ class TransitionPlanResponse(BaseModel):
     has_valid_courses: bool
     message: Optional[str] = None
 
+class CleanChatHistoryRequest(BaseModel):
+    user_name: str
+    timestamp: datetime
+
 @router.post("/resume", status_code=status.HTTP_201_CREATED)
 async def upload_resume(
     file: UploadFile = File(...),
@@ -279,6 +284,26 @@ def store_skill_ratings_endpoint(data: LearningPathData):
             detail=f"Error storing learning path: {str(e)}"
         )
 
+@router.post("/chat-history/clean")
+def clean_chat_history(request: CleanChatHistoryRequest):
+    try:
+        from backend.database import clean_chat_history
+        flag, message = clean_chat_history(request.user_name, request.timestamp)
+        logger.info(f"Chat history cleaned: {flag} | {message}")
+        if flag:
+            return {
+                "message": message,
+                "user_name": request.user_name
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error: {message}"
+            )
+    except Exception as e:
+        raise HTTPException(status_code=405, detail=f"Error cleaning chat history: {str(e)}")
+    # except Exception as e:
+    #     raise HTTPException(status_code=500, detail=f"Error cleaning chat history: {str(e)}")
 
 @router.get("/chat-history/recent", response_model=List[ChatHistoryResponse])
 def fetch_recent_chats(user_name: str, limit: int = Query(5, ge=1, le=20)):

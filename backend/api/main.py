@@ -16,10 +16,21 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Set up CORS
+# Get environment variables
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8501")
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+
+# Set up CORS with environment-specific configuration
+if ENVIRONMENT == "production":
+    # In production, only allow the specific frontend URL
+    allowed_origins = [FRONTEND_URL]
+else:
+    # In development, allow all origins
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with your frontend URL
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,25 +96,34 @@ logging_config = {
             "level": "DEBUG",
             "formatter": "detailed",
         },
-        "file": {
-            "class": "logging.FileHandler",
+        "rotating_file": {
+            "class": "logging.handlers.RotatingFileHandler",
             "filename": "api_server.log",
+            "maxBytes": 1048576,
+            "backupCount": 3,
             "level": "DEBUG",
             "formatter": "detailed",
         },
     },
     "loggers": {
         "": {  # Root logger
-            "handlers": ["console", "file"],
+            "handlers": ["console", "rotating_file"],
             "level": "DEBUG",
         },
         "uvicorn": {
-            "handlers": ["console", "file"],
+            "handlers": ["console", "rotating_file"],
             "level": "INFO",
+            "propagate": False,
         },
         "uvicorn.error": {
-            "handlers": ["console", "file"],
+            "handlers": ["console", "rotating_file"],
             "level": "INFO",
+            "propagate": False,
+        },
+        "snowflake.connector": {
+            "handlers": ["console", "rotating_file"],
+            "level": "DEBUG",
+            "propagate": False
         },
     },
 }
@@ -112,7 +132,7 @@ logging_config = {
 dictConfig(logging_config)
 
 # Enable detailed Snowflake connector logging
-logging.getLogger('snowflake.connector').setLevel(logging.DEBUG)
+logging.getLogger('snowflake.connector').setLevel(logging.INFO)
 
 if __name__ == "__main__":
     uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True, log_level="debug") 

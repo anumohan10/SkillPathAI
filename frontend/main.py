@@ -1,17 +1,38 @@
 # main.py
 import streamlit as st
+import logging
+import sys
+
+# Set up minimal logging
+logging.basicConfig(
+    level=logging.WARNING,  # Only log warnings and errors
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.FileHandler("app_errors.log")]
+)
+
+logger = logging.getLogger("SkillPathAI")
+
+# Set page to wide mode - must be the first Streamlit command
+st.set_page_config(
+    page_title="SkillPathAI",
+    layout="wide",  # This sets wide mode
+    initial_sidebar_state="expanded"
+)
+
 from auth import login_page, signup_page
 from dashboard import main_app
 
 # Load custom CSS from styles.css
-with open("styles.css", "r") as f:
-    css = f.read()
-st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+try:
+    with open("styles.css", "r") as f:
+        css = f.read()
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+except Exception as e:
+    logger.error("Failed to load CSS: %s", str(e))
 
 def main():
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
-        
 
     if st.session_state["authenticated"]:
         main_app()
@@ -37,4 +58,7 @@ def main():
             signup_page()
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        logger.critical("Application crashed: %s", str(e), exc_info=True)

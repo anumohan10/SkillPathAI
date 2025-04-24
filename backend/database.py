@@ -13,15 +13,28 @@ logger = logging.getLogger(__name__)
 def get_snowflake_connection():
     """Establish a connection to Snowflake using .env credentials."""
     try:
+        # Get environment variables with fallbacks
+        user = os.getenv("SNOWFLAKE_USER")
+        password = os.getenv("SNOWFLAKE_PASSWORD")
+        account = os.getenv("SNOWFLAKE_ACCOUNT")
+        role = os.getenv("SNOWFLAKE_ROLE", "ACCOUNTADMIN")  # Default role if not specified
+        warehouse = os.getenv("SNOWFLAKE_WAREHOUSE")
+        database = os.getenv("SNOWFLAKE_DATABASE")
+        schema = os.getenv("SNOWFLAKE_SCHEMA")
+        
+        # Log connection attempt (without sensitive info)
+        logger.info(f"Connecting to Snowflake: account={account}, user={user}, warehouse={warehouse}, database={database}, schema={schema}")
+        
         conn = snowflake.connector.connect(
-            user=os.getenv("SNOWFLAKE_USER"),
-            password=os.getenv("SNOWFLAKE_PASSWORD"),
-            account=os.getenv("SNOWFLAKE_ACCOUNT"),
-            role=os.getenv("SNOWFLAKE_ROLE"),
-            warehouse=os.getenv("SNOWFLAKE_WAREHOUSE"),
-            database=os.getenv("SNOWFLAKE_DATABASE"),
-            schema=os.getenv("SNOWFLAKE_SCHEMA"),
+            user=user,
+            password=password,
+            account=account,
+            role=role,
+            warehouse=warehouse,
+            database=database,
+            schema=schema,
         )
+        logger.info("✅ Successfully connected to Snowflake")
         return conn
     except Exception as e:
         logger.error(f"❌ Error connecting to Snowflake: {e}")
@@ -101,6 +114,19 @@ def retrieve_session_state(user_name, limit):
     except Exception as e:
         logger.warning(f"Database error while retrieving session data: {e}") 
         
-def clean_up_session(cur):
-    pass
-    
+def clean_chat_history(user_name, timestamp):
+    logger.info(f"Cleaning chat history for user {user_name} at timestamp {timestamp}")
+    try:
+        conn = get_snowflake_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        DELETE FROM chat_history
+        WHERE user_name = %s AND cur_timestamp = %s
+        """, (user_name, timestamp))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return True, "Chat history cleaned successfully"
+    except Exception as e:
+        logger.error(f"❌ Error cleaning chat history: {e}")
+        return False, f"Database error: {e}"
