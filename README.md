@@ -1,5 +1,6 @@
 # SkillPathAI
 
+![SkillPathAI Logo](Skillpath_AI.png)
 ## Overview
 SkillPathAI is a career transition and skill development platform that helps users navigate their professional journey. The platform provides personalized learning paths and career guidance through an intuitive web interface.
 

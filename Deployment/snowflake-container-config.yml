@@ -2,8 +2,9 @@ version: '1.0'
 
 services:
   - name: skillpathai-frontend
-    image: skillpathai-frontend
+    image: ${SNOWFLAKE_ACCOUNT}.registry.snowflakecomputing.com/${SNOWFLAKE_DATABASE_LOWER}/${SNOWFLAKE_SCHEMA_LOWER}/skillpath_repo/frontend:latest
     port: 8501
+    compute_pool: SYSTEM_COMPUTE_POOL_CPU
     env:
       - name: API_URL
         value: http://skillpathai-backend:8000
@@ -31,8 +32,9 @@ services:
       max_attempts: 3
 
   - name: skillpathai-backend
-    image: skillpathai-backend
+    image: ${SNOWFLAKE_ACCOUNT}.registry.snowflakecomputing.com/${SNOWFLAKE_DATABASE_LOWER}/${SNOWFLAKE_SCHEMA_LOWER}/skillpath_repo/backend:latest
     port: 8000
+    compute_pool: SYSTEM_COMPUTE_POOL_CPU
     env:
       - name: ENVIRONMENT
         value: production
