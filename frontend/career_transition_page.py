@@ -11,17 +11,18 @@ import requests
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import backend services
-from frontend.ui_service import format_transition_plan
+from frontend.ui_formatter import format_transition_plan
 
-# Set up logging
+# Set up logging (consider moving configuration to a central place)
 logging.basicConfig(
-    level=logging.INFO, # Changed default level
+    level=logging.INFO, # Changed default level to INFO
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("logs/career_transition_debug.log", mode='a'), # Append mode
-        logging.StreamHandler(sys.stdout)
+        logging.FileHandler("logs/career_transition.log"),
+        logging.StreamHandler()
     ]
 )
+
 logger = logging.getLogger(__name__)
 now = datetime.now()
 

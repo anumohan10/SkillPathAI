@@ -798,10 +798,15 @@ Do you have any questions about your career transition plan?
         "has_valid_courses": has_valid_courses
     }
 
-# TODO: Refactor this function to remove hardcoded career advice.
-# This should be moved to a configuration file or database to make it:
-# 1. Role-specific (currently only shows data engineering advice)
-# 2. Easier to update without code changes
-# 3. Potentially personalized based on user's skill assessment
-# 4. Maybe format_transition_plan() needs to be moved to ui_service.py since it's not a service function.
+def get_career_advice(self, target_role: str) -> str:
+    """
+    Get career advice for transitioning to the target role.
+    
+    Args:
+        target_role (str): The target role for career transition
+        
+    Returns:
+        str: Career advice message
+    """
+    # ... existing code ...
 

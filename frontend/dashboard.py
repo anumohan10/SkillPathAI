@@ -22,8 +22,8 @@ from frontend.guidance_hub_page import render_guidance_hub_page
 from frontend.learning_path_page import render_learning_path_page
 from frontend.career_transition_page import render_career_transition_page
 
-# Load custom CSS from styles.css
-with open("styles.css", "r") as f:
+css_path = os.path.join(os.path.dirname(__file__), "styles.css")
+with open(css_path, "r") as f:
     css = f.read()
 st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 

@@ -1,4 +1,4 @@
-# File: frontend/ui_service.py
+# File: frontend/ui_formatter.py
 import logging
 import pandas as pd
 from typing import List, Dict, Any
@@ -21,7 +21,7 @@ def format_course_message(courses_df, target_role):
     if courses_df.empty:
         return f"I couldn't find specific courses for {target_role} at this time. Please check with your administrator about updating the course database.", False
     
-    course_msg = f"# Data Engineer Learning Path\n\n"
+    course_msg = f"# {target_role} Learning Path\n\n"
     levels = ["BEGINNER", "INTERMEDIATE", "ADVANCED"]
     has_valid_courses = False
     
@@ -67,7 +67,7 @@ def format_course_message(courses_df, target_role):
                     # Add the platform/level info using markdown formatting
                     course_msg += f"> {platform_text}\n\n"
                     
-                    # Add description with better formatting using bullet points for long descriptions
+                    # Add description with better formatting using paragraphs
                     if course['DESCRIPTION'] and str(course['DESCRIPTION']).lower() != 'none':
                         desc = course['DESCRIPTION']
                         # Format longer descriptions into a more readable format
@@ -88,8 +88,7 @@ def format_course_message(courses_df, target_role):
                             # Create a nicely formatted description
                             course_msg += f"**What you'll learn**:\n\n"
                             for para in paragraphs:
-                                course_msg += f"- {para}\n"
-                            course_msg += "\n"
+                                course_msg += f"{para}\n\n"
                         else:
                             course_msg += f"**What you'll learn**: {desc}\n\n"
                     
@@ -163,22 +162,16 @@ def format_career_advice():
     
     Returns:
         str: A markdown-formatted career advice message
-        
-    TODO: Refactor this function to remove hardcoded career advice.
-    This should be moved to a configuration file or database to make it:
-    1. Role-specific (currently only shows data engineering advice)
-    2. Easier to update without code changes
-    3. Potentially personalized based on user's skill assessment
     """
     return """
 # 💼 Next Steps After Completing Your Learning Path
 
 Once you've completed the courses in your learning path, consider these steps to advance your career:
 
-1. **Build a portfolio** - Create 2-3 data engineering projects demonstrating your skills with cloud platforms, data pipelines, and big data technologies
-2. **Get certified** - Pursue relevant certifications like Google Cloud Professional Data Engineer or AWS Data Analytics Specialty
-3. **Join communities** - Connect with other data professionals on forums like Stack Overflow, Reddit's r/dataengineering, or Meetup groups
-4. **Contribute to open source** - Participate in data engineering open source projects to gain recognition
+1. **Build a portfolio** - Create 2-3  projects demonstrating your skills 
+2. **Get certified** - Pursue relevant certifications
+3. **Join communities** - Connect with other professionalson forums 
+4. **Contribute to open source** - Participate in  events to gain recognition
 
 Do you have any questions about your learning path or career next steps?
 """

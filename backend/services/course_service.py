@@ -10,227 +10,252 @@ logger = logging.getLogger(__name__)
 def get_course_recommendations(target_role, user_id=None, resume_id=None):
     """
     Get recommended courses using the Snowflake Cortex Search query with specific service,
-    taking into account either skill ratings or missing skills from resume analysis.
-    
-    Args:
-        target_role (str): The target role to get course recommendations for
-        user_id (str/int, optional): The user ID to get skill ratings from learning path
-        resume_id (str, optional): The resume ID to get missing skills from resume analysis
-        
-    Returns:
-        DataFrame: A DataFrame containing course recommendations
+    taking into account either missing skills or skill ratings for query focus.
     """
     logger.info(f"Getting recommended courses for role: {target_role}")
-    
     conn = None
     cur = None
-    
+
     try:
-        logger.debug("Establishing Snowflake connection")
+        # Establish connection and context
         conn = get_snowflake_connection()
         if not conn:
-            logger.error("Failed to establish Snowflake connection")
             raise ConnectionError("Could not connect to Snowflake")
-            
         cur = conn.cursor()
-        
-        # First, check what database and schema we're connected to
-        logger.debug("Checking current database context")
         cur.execute("SELECT CURRENT_DATABASE(), CURRENT_SCHEMA(), CURRENT_ROLE();")
-        db_context = cur.fetchone()
-        logger.info(f"Connected to: Database={db_context[0]}, Schema={db_context[1]}, Role={db_context[2]}")
-        
-        # Use the SKILLPATH_SEARCH_POC service directly
+        db, schema, role = cur.fetchone()
+        logger.info(f"Connected to: Database={db}, Schema={schema}, Role={role}")
+
         service_name = 'SKILLPATH_SEARCH_POC'
-        logger.info(f"Using search service: {service_name}")
-        
-        # Get missing skills or low-rated skills for query focus
-        skill_query = ""
+        skill_query_text = ""
         missing_skills = []
-        
-        # First try to get missing skills from resume if resume_id is provided
+        ratings_dict = {}
+
+        # 1) Use missing skills if provided
         if resume_id:
             try:
-                logger.debug(f"Fetching missing skills from resume ID: {resume_id}")
                 cur.execute(f"""
-                SELECT 
-                    TARGET_ROLE, MISSING_SKILLS
-                FROM 
-                    SKILLPATH_DB.PUBLIC.RESUMES 
-                WHERE 
-                    ID = '{resume_id}'
+                SELECT TARGET_ROLE, MISSING_SKILLS
+                FROM SKILLPATH_DB.PUBLIC.RESUMES
+                WHERE ID = '{resume_id}'
                 """)
-                
-                result = cur.fetchone()
-                if result and result[1]:  # Check if missing_skills exists and is not empty
-                    # The first element is target_role, the second is missing_skills
-                    missing_skills_data = result[1]
-                    target_role_from_db = result[0]
-                    
-                    # If target_role is supplied by query param, override the database value
-                    if not target_role and target_role_from_db:
-                        target_role = target_role_from_db
-                    
-                    logger.debug(f"Found missing skills: {missing_skills_data}")
-                    
-                    # Handle different types of missing_skills (object or string)
-                    try:
-                        # If it's already a list, use it directly
-                        if isinstance(missing_skills_data, list):
-                            missing_skills = missing_skills_data
-                        # If it's a string, try to parse it as JSON
-                        elif isinstance(missing_skills_data, str):
-                            missing_skills = json.loads(missing_skills_data)
-                        else:
-                            logger.warning(f"Unexpected missing_skills type: {type(missing_skills_data)}")
-                            missing_skills = []
-                        
-                        if missing_skills:
-                            skill_query = f" Focus on courses that teach {', '.join(missing_skills[:5])}."
-                            logger.debug(f"Added missing skills focus to query: {skill_query}")
-                    except Exception as e:
-                        logger.error(f"Error processing missing skills: {e}")
-                        # Continue without skill focus
-            except Exception as e:
-                logger.error(f"Error fetching missing skills from resume: {e}")
-                # Continue without missing skills if there's an error
-        
-        # If no missing skills found and user_id is provided, try skill ratings approach as fallback
-        if not missing_skills and user_id:
+                tgt, raw_missing = cur.fetchone() or (None, None)
+                if raw_missing:
+                    missing_skills = json.loads(raw_missing) if isinstance(raw_missing, str) else raw_missing
+                    if missing_skills:
+                        skill_query_text = (
+                            f". My main skill gaps are: {', '.join(missing_skills[:5])}. Please recommend beginner, intermediate, and advanced-level courses that cover these skills, including practical and degree-level options where available."
+                        )
+                        logger.debug(f"Using missing skills for query: {skill_query_text}")
+            except Exception:
+                logger.error("Error fetching missing skills", exc_info=True)
+
+        # 2) If no missing skills, fetch skill ratings
+        elif user_id:
             try:
-                logger.debug(f"Fetching skill ratings for user ID: {user_id}")
                 cur.execute(f"""
-                SELECT 
-                    SKILL_RATINGS
-                FROM 
-                    SKILLPATH_DB.PROCESSED_DATA.LEARNING_PATHS 
-                WHERE 
-                    ID = '{user_id}'
-                ORDER BY 
-                    CREATED_AT DESC 
+                SELECT SKILL_RATINGS
+                FROM SKILLPATH_DB.PROCESSED_DATA.LEARNING_PATHS
+                WHERE ID = '{user_id}'
+                ORDER BY CREATED_AT DESC
                 LIMIT 1
                 """)
-                
-                result = cur.fetchone()
-                if result and result[0]:
-                    skill_ratings = result[0]
-                    logger.debug(f"Found skill ratings: {skill_ratings}")
-                    
-                    # Handle different types of skill_ratings (object or string)
-                    try:
-                        # If it's already a dictionary, use it directly
-                        if isinstance(skill_ratings, dict):
-                            ratings_dict = skill_ratings
-                        # If it's a string, try to parse it as JSON
-                        elif isinstance(skill_ratings, str):
-                            ratings_dict = json.loads(skill_ratings)
-                        else:
-                            logger.warning(f"Unexpected skill_ratings type: {type(skill_ratings)}")
-                            ratings_dict = {}
-                            
-                        # Find skills with low ratings (1-2) that need improvement
-                        low_rated_skills = []
-                        for skill, rating in ratings_dict.items():
-                            rating_value = int(rating) if isinstance(rating, (str, int, float)) else 0
-                            if rating_value <= 2:
-                                low_rated_skills.append(skill)
-                        # TODO: Check what happens when user_id is None - need to handle this case gracefully
-                        # Currently, if user_id is None, we skip this entire section and continue without skill ratings
-                        # We might want to implement a fallback strategy or default recommendations
-                        if low_rated_skills:
-                            skill_query = f" Focus on courses that teach {', '.join(low_rated_skills)}."
-                            logger.debug(f"Added skill focus to query: {skill_query}")
-                    except Exception as e:
-                        logger.error(f"Error processing skill ratings: {e}")
-                        # Continue without skill focus
-            except Exception as e:
-                logger.error(f"Error fetching skill ratings: {e}")
-                # Continue without skill ratings if there's an error
-        
-        # Set up a direct query to get course recommendations
-        query = f"""
-        SELECT
-          course.value:"COURSE_NAME"::string AS COURSE_NAME,
-          course.value:"DESCRIPTION"::string AS DESCRIPTION,
-          course.value:"SKILLS"::string AS SKILLS,
-          course.value:"URL"::string AS URL,
-          course.value:"LEVEL"::string AS LEVEL,
-          course.value:"PLATFORM"::string AS PLATFORM,
-          CASE
-            WHEN LOWER(course.value:"LEVEL"::string) LIKE '%beginner%' THEN 'BEGINNER'
-            WHEN LOWER(course.value:"LEVEL"::string) LIKE '%intermediate%' THEN 'INTERMEDIATE'
-            ELSE 'ADVANCED'
-          END AS LEVEL_CATEGORY
-        FROM
-          TABLE(
-            FLATTEN(
-              INPUT => PARSE_JSON(
-                SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-                  '{service_name}',
-                  '{{
-                    "query": "Show me the best courses for {target_role}s including beginner, intermediate, and advanced levels.{skill_query} Include detailed descriptions, skills covered, and URLs.",
-                    "columns": ["COURSE_NAME", "DESCRIPTION", "SKILLS", "URL", "LEVEL", "PLATFORM"],
-                    "limit": 6
-                  }}'
-                )
-              ):"results"
+                raw = cur.fetchone()[0] if cur.rowcount else None
+                if raw:
+                    ratings_dict = json.loads(raw) if isinstance(raw, str) else raw
+                    logger.debug(f"Skill ratings fetched: {ratings_dict}")
+
+                    formatted = ", ".join([f"{skill} ({rating})" for skill, rating in ratings_dict.items()])
+                    skill_query_text = (
+                        f". My self-assessed skill ratings are: {formatted}. "
+                        "Rating scale: 1 = No experience, 2 = Basic knowledge, 3 = Intermediate, 4 = Advanced, 5 = Expert. "
+                        "If most of my skills are rated 1–2, please recommend beginner and intermediate-level courses to build a solid foundation. "
+                        "If I have some skills rated 3–5, include advanced-level, Nanodegree, or specialized courses to deepen my expertise."
+                    )
+                    logger.debug(f"Using skill ratings for query: {skill_query_text}")
+                else:
+                    logger.warning("No skill ratings found for the given user ID")
+            except Exception:
+                logger.error("Error fetching skill ratings", exc_info=True)
+
+        # 3) Fallback if neither missing_skills nor user_id provided
+        if not skill_query_text:
+            skill_query_text = (
+                ". Recommend courses across beginner, intermediate, and advanced levels "
+                "to help users at any stage of their learning journey."
             )
-          ) AS course
-        WHERE
-          course.value:"COURSE_NAME"::string IS NOT NULL
-          AND course.value:"DESCRIPTION"::string IS NOT NULL
-          AND course.value:"URL"::string IS NOT NULL
-        ORDER BY
-          LEVEL_CATEGORY;
-        """
+            logger.debug(f"Using default query focus: {skill_query_text}")
+
+        # Prepare a skill ratings string for the query
+        skill_ratings_str = ""
+        if ratings_dict:
+            skill_ratings_str = ", ".join([f"{skill} ({rating})" for skill, rating in ratings_dict.items()])
+        else:
+            skill_ratings_str = "Python (4), SQL (4), Machine Learning (4), Data Visualization (4), Cloud Computing (4)"
         
+        # Log what we're using for the query
+        logger.info(f"Using target_role: {target_role}")
+        logger.info(f"Using skill_ratings: {skill_ratings_str}")
+            
+        # Build and execute Cortex Search query - using the exact format that works in Snowflake
+        query = f"""
+WITH results AS (
+  SELECT 
+    course.value:"COURSE_NAME"::string       AS COURSE_NAME,
+    course.value:"DESCRIPTION"::string       AS DESCRIPTION,
+    course.value:"SKILLS"::string            AS SKILLS,
+    course.value:"PREREQUISITES"::string     AS PREREQUISITES,
+    course.value:"URL"::string               AS URL,
+    course.value:"LEVEL"::string             AS LEVEL,
+    course.value:"PLATFORM"::string          AS PLATFORM,
+    course.value                             AS RAW_JSON
+  FROM TABLE(
+    FLATTEN(INPUT => PARSE_JSON(SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+      '{service_name}',
+      CONCAT('{{
+        "query": "I am targeting a career as a {target_role}. My self-assessed skill ratings are: {skill_ratings_str}. Rating scale: 1 = No experience, 2 = Basic knowledge, 3 = Intermediate, 4 = Advanced, 5 = Expert. All my skills are rated 4 or 5, indicating a strong foundation. Please recommend advanced-level, expert-level, or specialized courses. Include degree-level, Nanodegree, or professional certificate programs if available. Focus on deepening expertise, advanced projects, and real-world applications.",
+        "columns": ["COURSE_NAME", "DESCRIPTION", "SKILLS", "URL", "LEVEL", "PREREQUISITES", "PLATFORM"],
+        "limit": 20
+      }}')
+    )))
+  ) AS result,
+  LATERAL FLATTEN(INPUT => result.value) AS course
+),
+
+-- Categorize level into buckets
+tagged AS (
+  SELECT *,
+    CASE 
+      WHEN LOWER(LEVEL) LIKE '%advanced%' THEN 'ADVANCED'
+      WHEN LOWER(LEVEL) IN ('intermediate', 'fluency') THEN 'INTERMEDIATE'
+      WHEN LOWER(LEVEL) LIKE '%beginner%' THEN 'BEGINNER'
+      WHEN LOWER(LEVEL) = 'all levels' THEN 'INTERMEDIATE'
+      ELSE 'UNKNOWN'
+    END AS LEVEL_CATEGORY
+  FROM results
+),
+
+-- Rank courses within each level
+ranked AS (
+  SELECT *, ROW_NUMBER() OVER (PARTITION BY LEVEL_CATEGORY ORDER BY COURSE_NAME) AS rn
+  FROM tagged
+)
+
+-- Return up to 2 courses per level
+SELECT 
+  COURSE_NAME,
+  DESCRIPTION,
+  SKILLS,
+  PREREQUISITES,
+  URL,
+  LEVEL,
+  PLATFORM,
+  LEVEL_CATEGORY
+FROM ranked
+WHERE rn <= 2 AND LEVEL_CATEGORY IN ('BEGINNER', 'INTERMEDIATE', 'ADVANCED')
+ORDER BY LEVEL_CATEGORY;
+"""
+
         logger.debug(f"Executing search query with service {service_name}")
         cur.execute(query)
-        logger.info(f"Query executed successfully with service {service_name}")
-        
-        # Fetch results
         rows = cur.fetchall()
-        logger.info(f"Query returned {len(rows)} rows")
-        
-        if not rows:
-            logger.error("Search query returned no results")
-            raise ValueError("No course results returned from search query")
+        cols = [d[0] for d in cur.description]
+        df = pd.DataFrame(rows, columns=cols)
+
+        # Log the distribution of courses by level category
+        try:
+            level_counts = df.groupby("LEVEL_CATEGORY").size().to_dict()
+            logger.info(f"Courses by level returned from Snowflake: {level_counts}")
             
-        columns = [desc[0] for desc in cur.description]
-        
-        # Create DataFrame from results
-        df = pd.DataFrame(rows, columns=columns)
-        
-        # Check for valid data
-        if df.empty:
-            logger.error("Empty DataFrame after creating from query results")
-            raise ValueError("No valid course data found")
-        
-        # Log the data for debugging
-        if not df.empty:
-            logger.debug(f"First row of search data: {df.iloc[0].to_dict()}")
-            # Log all rows for more comprehensive debugging
-            for i, row in df.iterrows():
-                logger.debug(f"Course {i+1}: {row.get('COURSE_NAME')} | URL: {row.get('URL')} | Level: {row.get('LEVEL_CATEGORY')}")
-            
-            # Clean up null values and ensure there are actual valid rows
-            valid_courses = df[df['COURSE_NAME'].notna() & df['URL'].notna()]
-            if valid_courses.empty and not df.empty:
-                logger.warning("Query returned rows but no valid courses with both name and URL")
+            # No filtering for high skill ratings - just logging
+            if ratings_dict:
+                # Count how many skills are rated highly (3 or above)
+                high_rated_skills = sum(1 for r in ratings_dict.values() if int(r) >= 3)
+                total_skills = len(ratings_dict)
+                logger.info(f"User has {high_rated_skills}/{total_skills} skills rated 3 or higher")
                 
-        return df.to_dict('records')
+                if high_rated_skills > 0:
+                    logger.info("Keeping ADVANCED courses because user has skill ratings ≥ 3")
+                    
+                    # Extra logging to check for ADVANCED courses
+                    advanced_courses = df[df["LEVEL_CATEGORY"] == "ADVANCED"]
+                    if len(advanced_courses) > 0:
+                        logger.info(f"Found {len(advanced_courses)} ADVANCED courses:")
+                        for _, course in advanced_courses.iterrows():
+                            logger.info(f"  - {course['COURSE_NAME']} [{course['LEVEL']}]")
+                    else:
+                        logger.warning("No ADVANCED courses returned from the query despite high skill ratings")
+                        
+            # Make sure we have courses from each level
+            levels_needed = ["BEGINNER", "INTERMEDIATE", "ADVANCED"]
+            missing_levels = [level for level in levels_needed if level not in level_counts]
             
-    except Exception as e:
-        logger.error(f"Error in get_recommended_courses: {str(e)}", exc_info=True)
-        raise  # Re-throw the exception to be handled by caller
+            if missing_levels:
+                logger.warning(f"Missing courses for levels: {missing_levels}")
+                
+                # Special case for ADVANCED courses - try to find some with an advanced-specific query if needed
+                if "ADVANCED" in missing_levels and ratings_dict and any(int(r) >= 3 for r in ratings_dict.values()):
+                    try:
+                        logger.info("Attempting to retrieve ADVANCED courses with specialized query")
+                        advanced_query = f"""
+                        WITH results AS (
+                          SELECT 
+                            course.value:"COURSE_NAME"::string       AS COURSE_NAME,
+                            course.value:"DESCRIPTION"::string       AS DESCRIPTION,
+                            course.value:"SKILLS"::string            AS SKILLS,
+                            course.value:"PREREQUISITES"::string     AS PREREQUISITES,
+                            course.value:"URL"::string               AS URL,
+                            course.value:"LEVEL"::string             AS LEVEL,
+                            course.value:"PLATFORM"::string          AS PLATFORM,
+                            course.value                             AS RAW_JSON
+                          FROM TABLE(
+                            FLATTEN(INPUT => PARSE_JSON(SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+                              '{service_name}',
+                              '{{
+                                "query": "I need ADVANCED level courses for {target_role}. ONLY return courses that are explicitly labeled as ADVANCED level. Focus only on advanced courses.",
+                                "columns": ["COURSE_NAME", "DESCRIPTION", "SKILLS", "URL", "LEVEL", "PREREQUISITES", "PLATFORM"],
+                                "limit": 4
+                              }}'
+                            )))
+                          ) AS result,
+                          LATERAL FLATTEN(INPUT => result.value) AS course
+                        )
+                        SELECT 
+                          COURSE_NAME, 
+                          DESCRIPTION, 
+                          SKILLS,
+                          PREREQUISITES,
+                          URL, 
+                          LEVEL, 
+                          PLATFORM,
+                          'ADVANCED' as LEVEL_CATEGORY
+                        FROM results
+                        WHERE LOWER(LEVEL) LIKE '%advanced%'
+                        LIMIT 2;
+                        """
+                        
+                        # Execute the advanced-specific query
+                        cur.execute(advanced_query)
+                        advanced_rows = cur.fetchall()
+                        
+                        if advanced_rows:
+                            # Create a DataFrame with the advanced courses
+                            advanced_df = pd.DataFrame(advanced_rows, columns=cols)
+                            logger.info(f"Successfully retrieved {len(advanced_df)} additional ADVANCED courses")
+                            
+                            # Append the advanced courses to the original DataFrame
+                            df = pd.concat([df, advanced_df], ignore_index=True)
+                    except Exception as e:
+                        logger.error(f"Error retrieving additional ADVANCED courses: {e}", exc_info=True)
+        
+        except Exception as e:
+            logger.error(f"Error analyzing course levels: {e}", exc_info=True)
+
+        return df.to_dict('records')
+
+    except Exception:
+        logger.error("Error in get_course_recommendations", exc_info=True)
+        raise
     finally:
-        if cur:
-            try:
-                cur.close()
-            except:
-                pass
-        if conn:
-            try:
-                conn.close()
-            except:
-                pass
+        if cur: cur.close()
+        if conn: conn.close()

@@ -9,6 +9,11 @@ st.set_page_config(
 
 import logging
 import sys
+import time
+import os
+
+# Ensure logs directory exists
+os.makedirs("logs", exist_ok=True)
 
 # Set up minimal logging
 logging.basicConfig(
@@ -19,15 +24,15 @@ logging.basicConfig(
 
 logger = logging.getLogger("SkillPathAI")
 
-
-from auth import login_page, signup_page, forgot_password_page
-from dashboard import main_app
-import time
-import os
+# Add the parent directory to sys.path to allow absolute imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from frontend.auth_page import login_page, signup_page, forgot_password_page
+from frontend.dashboard import main_app
 
 # Load custom CSS from styles.css
 try:
-    with open("styles.css", "r") as f:
+    css_path = os.path.join(os.path.dirname(__file__), "styles.css")
+    with open(css_path, "r") as f:
         css = f.read()
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 except Exception as e:
@@ -44,7 +49,7 @@ def main():
 
     # Show splash screen if not yet shown
     if not st.session_state["splash_shown"]:
-        image_path = os.path.join("assets", "splash_logo.png")
+        image_path = os.path.join(os.path.dirname(__file__), "assets", "splash_logo.png")
         # Center the content using columns
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:

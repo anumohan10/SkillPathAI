@@ -19,7 +19,7 @@
 │   ├── Courses (courses_page.py)
 │   ├── Profile (profile_page.py)
 │   └── Guidance Hub (guidance_hub_page.py)
-├── UI Services (ui_service.py)
+├── UI Services (ui_formatter.py)
 └── Assets & Styling
     ├── CSS (styles.css)
     └── Static Assets (assets/)

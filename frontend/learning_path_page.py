@@ -11,7 +11,7 @@ import requests
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import backend services
-from frontend.ui_service import format_course_message, format_introduction, format_career_advice, format_skills_for_display
+from frontend.ui_formatter import format_course_message, format_introduction, format_career_advice, format_skills_for_display
 
 # Set up logging (consider moving configuration to a central place)
 logging.basicConfig(

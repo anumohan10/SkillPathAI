@@ -11,7 +11,8 @@ import os
 API_URL = os.environ.get("API_URL", "http://backend:8000")
 
 # Load custom CSS from styles.css
-with open("styles.css", "r") as f:
+css_path = os.path.join(os.path.dirname(__file__), "styles.css")
+with open(css_path, "r") as f:
     css = f.read()
 st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 

@@ -23,13 +23,14 @@ RUN pip install --no-cache-dir -r backend-requirements.txt
 # Copy application code
 COPY . .
 
-# Expose ports for frontend and backend
-EXPOSE 8501 8000
+# Create necessary directories and set permissions
+RUN mkdir -p /app/frontend/logs && \
+    chmod -R 777 /app/frontend/logs
 
-# Create a script to run both services
+# Create a script to run both services with debugging
 RUN echo '#!/bin/bash\n\
 if [ "$SERVICE" = "frontend" ]; then\n\
-  cd /app/frontend && streamlit run main.py --server.address 0.0.0.0 --server.port 8501\n\
+  cd /app && streamlit run frontend/main.py --server.address 0.0.0.0 --server.port 8501\n\
 elif [ "$SERVICE" = "backend" ]; then\n\
   cd /app/backend && uvicorn api.main:app --host 0.0.0.0 --port 8000\n\
 else\n\

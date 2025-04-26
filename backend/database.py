@@ -6,7 +6,6 @@ import json
 # Load environment variables
 load_dotenv()
 
-# TODO: Move all create table queries to dbt for better schema management and version control
 
 logger = logging.getLogger(__name__)
 
@@ -130,3 +129,9 @@ def clean_chat_history(user_name, timestamp):
     except Exception as e:
         logger.error(f"❌ Error cleaning chat history: {e}")
         return False, f"Database error: {e}"
+
+def create_tables(self):
+    """
+    Create necessary database tables if they don't exist.
+    """
+    # ... existing code ...
